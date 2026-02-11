@@ -1,0 +1,22 @@
+import { Body, Controller, Get, Post, Query, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { ProductService } from '@/modules/web/product/product.service';
+import { CreateProductRequest } from '@/modules/web/product/dto/create-product-request.dto';
+import { Public } from '@/common/decorators/public.decorator';
+import { fileInterceptor } from '@/common/interceptors/file.interceptor';
+
+@Public()
+@Controller('product')
+export class ProductController {
+  constructor(private readonly productService: ProductService) {}
+
+  @Get()
+  getByCategory(@Query('category') categoryId: string) {
+    return this.productService.getByCategory(categoryId);
+  }
+
+  @Post('create')
+  @UseInterceptors(fileInterceptor('product'))
+  create(@Body() body: CreateProductRequest, @UploadedFile() file: Express.Multer.File) {
+    return this.productService.create(file.filename, body);
+  }
+}
