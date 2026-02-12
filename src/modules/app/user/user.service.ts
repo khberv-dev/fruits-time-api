@@ -9,6 +9,10 @@ export class UserService {
   constructor(@InjectRepository(User) private readonly userRepo: Repository<User>) {}
 
   getUserInfo(userId: string) {
+    if (!userId) {
+      throw new UnauthorizedException();
+    }
+
     return this.userRepo.findOne({
       where: {
         id: userId,
@@ -17,10 +21,6 @@ export class UserService {
   }
 
   async updateUserInfo(userId: string, data: UpdateUserRequest) {
-    if (!userId) {
-      throw new UnauthorizedException();
-    }
-
     const user = await this.userRepo.findOne({
       where: {
         id: userId,
@@ -28,7 +28,7 @@ export class UserService {
     });
 
     if (!user) {
-      throw new UnauthorizedException();
+      throw new BadRequestException();
     }
 
     const userWithPhoneNumber = await this.userRepo.findOne({
