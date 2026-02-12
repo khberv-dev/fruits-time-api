@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { User } from '@/shared/entities/user.entity';
 import { Repository } from 'typeorm';
@@ -17,6 +17,10 @@ export class UserService {
   }
 
   async updateUserInfo(userId: string, data: UpdateUserRequest) {
+    if (!userId) {
+      throw new UnauthorizedException();
+    }
+
     const user = await this.userRepo.findOne({
       where: {
         id: userId,
@@ -24,7 +28,7 @@ export class UserService {
     });
 
     if (!user) {
-      throw new BadRequestException('Foydalanuvchi topilmadi');
+      throw new UnauthorizedException();
     }
 
     const userWithPhoneNumber = await this.userRepo.findOne({
