@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Category } from '@/shared/entities/category.entity';
 import { Repository } from 'typeorm';
 import { CreateCategoryRequest } from '@/modules/web/category/dto/create-category-request.dto';
+import { UpdateCategoryRequest } from '@/modules/web/category/dto/update-category-request.dto';
 
 @Injectable()
 export class CategoryService {
@@ -25,5 +26,13 @@ export class CategoryService {
         createdAt: 'desc',
       },
     });
+  }
+
+  async update(categoryId: string, data: UpdateCategoryRequest) {
+    await this.categoryRepo.update(categoryId, data);
+
+    return {
+      message: "Ma'lumot yangilandi",
+    };
   }
 }

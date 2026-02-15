@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Product } from '@/shared/entities/product.entity';
 import { Repository } from 'typeorm';
@@ -8,17 +8,14 @@ import { CreateProductRequest } from '@/modules/web/product/dto/create-product-r
 export class ProductService {
   constructor(@InjectRepository(Product) private readonly productRepo: Repository<Product>) {}
 
-  getByCategory(categoryId: string) {
-    if (!categoryId) {
-      throw new BadRequestException();
-    }
-
+  get(categoryId: string) {
     return this.productRepo.find({
       where: {
         category: {
           id: categoryId,
         },
       },
+      relations: ['category'],
       order: {
         createdAt: 'desc',
       },

@@ -4,10 +4,10 @@ import { ConfigService } from '@nestjs/config';
 import { StringValue } from 'ms';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { User } from '@/shared/entities/user.entity';
-import { JwtStrategy } from '@/shared/auth/jwt.strategy';
-import { AuthService } from './auth.service';
 import { Otp } from '@/shared/entities/otp.entity';
-import { AuthController } from './auth.controller';
+import { JwtStrategy } from '@/shared/auth/jwt.strategy';
+import { AuthController } from '@/modules/web/auth/auth.controller';
+import { AuthService } from '@/modules/web/auth/auth.service';
 
 @Module({
   imports: [
@@ -25,4 +25,4 @@ import { AuthController } from './auth.controller';
   controllers: [AuthController],
   providers: [JwtStrategy, AuthService],
 })
-export class AuthModule {}
+export class AuthWebModule {}

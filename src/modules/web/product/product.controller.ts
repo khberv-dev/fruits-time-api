@@ -4,14 +4,13 @@ import { CreateProductRequest } from '@/modules/web/product/dto/create-product-r
 import { Public } from '@/common/decorators/public.decorator';
 import { fileInterceptor } from '@/common/interceptors/file.interceptor';
 
-@Public()
 @Controller('product')
 export class ProductController {
   constructor(private readonly productService: ProductService) {}
 
   @Get()
   getByCategory(@Query('category') categoryId: string) {
-    return this.productService.getByCategory(categoryId);
+    return this.productService.get(categoryId);
   }
 
   @Post('create')
