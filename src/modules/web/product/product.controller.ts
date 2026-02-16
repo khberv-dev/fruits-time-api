@@ -1,7 +1,6 @@
 import { Body, Controller, Get, Post, Query, UploadedFile, UseInterceptors } from '@nestjs/common';
 import { ProductService } from '@/modules/web/product/product.service';
 import { CreateProductRequest } from '@/modules/web/product/dto/create-product-request.dto';
-import { Public } from '@/common/decorators/public.decorator';
 import { fileInterceptor } from '@/common/interceptors/file.interceptor';
 
 @Controller('product')

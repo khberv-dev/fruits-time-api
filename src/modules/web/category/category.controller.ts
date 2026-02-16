@@ -2,7 +2,6 @@ import { Body, Controller, Get, Param, Post, Put, UploadedFile, UseInterceptors 
 import { fileInterceptor } from '@/common/interceptors/file.interceptor';
 import { CategoryService } from '@/modules/web/category/category.service';
 import { CreateCategoryRequest } from '@/modules/web/category/dto/create-category-request.dto';
-import { Public } from '@/common/decorators/public.decorator';
 import { UpdateCategoryRequest } from '@/modules/web/category/dto/update-category-request.dto';
 
 @Controller('category')
