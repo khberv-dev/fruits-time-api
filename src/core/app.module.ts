@@ -10,10 +10,10 @@ import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
 import { CategoryModule } from '@/modules/app/category/category.module';
 import { CategoryWebModule } from '@/modules/web/category/category.module';
 import { ServeStaticModule } from '@nestjs/serve-static';
-import { ProductWebModule } from '@/modules/web/product/productWebModule';
 import { ProductModule } from '@/modules/app/product/product.module';
 import { AuthWebModule } from '@/modules/web/auth/auth.module';
 import { UserWebModule } from '@/modules/web/user/user.module';
+import { ProductWebModule } from '@/modules/web/product/product.module';
 
 @Module({
   imports: [

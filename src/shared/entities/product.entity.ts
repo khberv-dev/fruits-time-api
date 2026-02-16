@@ -8,6 +8,7 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { Category } from './category.entity';
+import { ProductType } from '@/shared/enums/product-type.enum';
 
 @Entity('products')
 export class Product {
@@ -22,6 +23,9 @@ export class Product {
 
   @Column()
   image: string;
+
+  @Column({ type: 'enum', enum: ProductType, default: ProductType.FRUIT })
+  type: ProductType;
 
   @Column({ name: 'is_active', default: true })
   isActive: boolean;

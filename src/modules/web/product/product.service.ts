@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Product } from '@/shared/entities/product.entity';
 import { Repository } from 'typeorm';
 import { CreateProductRequest } from '@/modules/web/product/dto/create-product-request.dto';
+import { UpdateProductRequest } from '@/modules/web/product/dto/update-product-request.dto';
 
 @Injectable()
 export class ProductService {
@@ -34,6 +35,14 @@ export class ProductService {
 
     return {
       message: 'Mahsulot yaratildi',
+    };
+  }
+
+  async update(productId: string, data: UpdateProductRequest) {
+    await this.productRepo.update(productId, data);
+
+    return {
+      message: "Ma'lumot yangilandi",
     };
   }
 }
