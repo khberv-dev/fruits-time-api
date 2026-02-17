@@ -38,8 +38,17 @@ export class ProductService {
     };
   }
 
-  async update(productId: string, data: UpdateProductRequest) {
-    await this.productRepo.update(productId, data);
+  async update(productId: string, fileName: string | undefined, data: UpdateProductRequest) {
+    const { categoryId, ...productData } = data;
+
+    if (categoryId) {
+      await this.productRepo.update(productId, {
+        category: {
+          id: categoryId,
+        },
+      });
+    }
+    await this.productRepo.update(productId, { ...productData, image: fileName });
 
     return {
       message: "Ma'lumot yangilandi",

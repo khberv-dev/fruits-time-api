@@ -1,5 +1,6 @@
-import { IsBoolean, IsInt, IsOptional, IsString } from 'class-validator';
+import { IsBoolean, IsEnum, IsInt, IsOptional, IsString } from 'class-validator';
 import { Type } from 'class-transformer';
+import { ProductType } from '@/shared/enums/product-type.enum';
 
 export class UpdateProductRequest {
   @IsOptional()
@@ -18,4 +19,8 @@ export class UpdateProductRequest {
   @IsOptional()
   @IsBoolean()
   isActive: boolean;
+
+  @IsOptional()
+  @IsEnum(ProductType)
+  type: ProductType;
 }

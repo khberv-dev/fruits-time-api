@@ -20,7 +20,12 @@ export class CategoryController {
   }
 
   @Put(':id')
-  update(@Param('id') categoryId: string, @Body() body: UpdateCategoryRequest) {
-    return this.categoryService.update(categoryId, body);
+  @UseInterceptors(fileInterceptor('category'))
+  update(
+    @Param('id') categoryId: string,
+    @Body() body: UpdateCategoryRequest,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    return this.categoryService.update(categoryId, file ? file.filename : undefined, body);
   }
 }

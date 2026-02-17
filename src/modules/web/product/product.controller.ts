@@ -20,7 +20,12 @@ export class ProductController {
   }
 
   @Put(':id')
-  update(@Param('id') productId: string, @Body() body: UpdateProductRequest) {
-    return this.productService.update(productId, body);
+  @UseInterceptors(fileInterceptor('product'))
+  update(
+    @Param('id') productId: string,
+    @Body() body: UpdateProductRequest,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    return this.productService.update(productId, file ? file.filename : undefined, body);
   }
 }

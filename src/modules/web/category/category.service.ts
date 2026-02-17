@@ -28,8 +28,8 @@ export class CategoryService {
     });
   }
 
-  async update(categoryId: string, data: UpdateCategoryRequest) {
-    await this.categoryRepo.update(categoryId, data);
+  async update(categoryId: string, fileName: string | undefined, data: UpdateCategoryRequest) {
+    await this.categoryRepo.update(categoryId, { ...data, image: fileName });
 
     return {
       message: "Ma'lumot yangilandi",
