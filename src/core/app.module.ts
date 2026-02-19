@@ -14,6 +14,8 @@ import { ProductModule } from '@/modules/app/product/product.module';
 import { AuthWebModule } from '@/modules/web/auth/auth.module';
 import { UserWebModule } from '@/modules/web/user/user.module';
 import { ProductWebModule } from '@/modules/web/product/product.module';
+import { PromotionWebModule } from '@/modules/web/promotion/promotion.module';
+import { PromotionModule } from '@/modules/app/promotion/promotion.module';
 
 @Module({
   imports: [
@@ -25,14 +27,18 @@ import { ProductWebModule } from '@/modules/web/product/product.module';
       rootPath: 'uploads',
       serveRoot: '/public',
     }),
+
     AuthModule,
     UserModule,
     CategoryModule,
     ProductModule,
+    PromotionModule,
+
     AuthWebModule,
     UserWebModule,
     CategoryWebModule,
     ProductWebModule,
+    PromotionWebModule,
   ],
   controllers: [AppController],
   providers: [
