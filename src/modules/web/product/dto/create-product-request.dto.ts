@@ -1,5 +1,6 @@
-import { IsInt, IsString } from 'class-validator';
+import { IsEnum, IsInt, IsString } from 'class-validator';
 import { Type } from 'class-transformer';
+import { ProductType } from '@/shared/enums/product-type.enum';
 
 export class CreateProductRequest {
   @IsString()
@@ -7,6 +8,9 @@ export class CreateProductRequest {
 
   @IsString()
   categoryId: string;
+
+  @IsEnum(ProductType)
+  type: ProductType;
 
   @IsInt()
   @Type(() => Number)
