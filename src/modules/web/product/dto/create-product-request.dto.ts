@@ -1,4 +1,4 @@
-import { IsEnum, IsInt, IsString } from 'class-validator';
+import { IsEnum, IsInt, IsOptional, IsString } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ProductType } from '@/shared/enums/product-type.enum';
 
@@ -15,4 +15,12 @@ export class CreateProductRequest {
   @IsInt()
   @Type(() => Number)
   price: number;
+
+  @IsOptional()
+  @IsString()
+  compound: string;
+
+  @IsOptional()
+  @IsString()
+  description: string;
 }

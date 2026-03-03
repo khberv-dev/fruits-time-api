@@ -27,6 +27,12 @@ export class Product {
   @Column({ type: 'enum', enum: ProductType, default: ProductType.FRUIT })
   type: ProductType;
 
+  @Column({ default: '' })
+  description: string;
+
+  @Column({ type: 'text', array: true, default: [] })
+  compound: string[];
+
   @Column({ name: 'is_active', default: true })
   isActive: boolean;
 

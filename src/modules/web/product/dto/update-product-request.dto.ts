@@ -23,4 +23,12 @@ export class UpdateProductRequest {
   @IsOptional()
   @IsEnum(ProductType)
   type: ProductType;
+
+  @IsOptional()
+  @IsString()
+  compound: string;
+
+  @IsOptional()
+  @IsString()
+  description: string;
 }

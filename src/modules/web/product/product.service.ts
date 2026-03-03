@@ -28,6 +28,8 @@ export class ProductService {
       title: data.title,
       price: data.price,
       image: fileName,
+      description: data.description,
+      compound: (data.compound || '').split(','),
       category: {
         id: data.categoryId,
       },
@@ -48,7 +50,11 @@ export class ProductService {
         },
       });
     }
-    await this.productRepo.update(productId, { ...productData, image: fileName });
+    await this.productRepo.update(productId, {
+      ...productData,
+      compound: productData.compound.split(','),
+      image: fileName,
+    });
 
     return {
       message: "Ma'lumot yangilandi",
