@@ -28,6 +28,14 @@ export class CategoryService {
     });
   }
 
+  getById(id: string) {
+    return this.categoryRepo.findOne({
+      where: {
+        id,
+      },
+    });
+  }
+
   async update(categoryId: string, fileName: string | undefined, data: UpdateCategoryRequest) {
     await this.categoryRepo.update(categoryId, { ...data, image: fileName });
 

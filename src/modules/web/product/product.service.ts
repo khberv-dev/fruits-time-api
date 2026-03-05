@@ -9,7 +9,7 @@ import { UpdateProductRequest } from '@/modules/web/product/dto/update-product-r
 export class ProductService {
   constructor(@InjectRepository(Product) private readonly productRepo: Repository<Product>) {}
 
-  get(categoryId: string) {
+  getByCategoryId(categoryId: string) {
     return this.productRepo.find({
       where: {
         category: {
@@ -19,6 +19,14 @@ export class ProductService {
       relations: ['category'],
       order: {
         createdAt: 'desc',
+      },
+    });
+  }
+
+  getById(id: string) {
+    return this.productRepo.findOne({
+      where: {
+        id,
       },
     });
   }

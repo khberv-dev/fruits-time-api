@@ -13,6 +13,11 @@ export class CategoryController {
     return this.categoryService.getAll();
   }
 
+  @Get(':id')
+  getById(@Param('id') id: string) {
+    return this.categoryService.getById(id);
+  }
+
   @Post('create')
   @UseInterceptors(fileInterceptor('category'))
   create(@Body() body: CreateCategoryRequest, @UploadedFile() file: Express.Multer.File) {

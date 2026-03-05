@@ -10,7 +10,12 @@ export class ProductController {
 
   @Get()
   getByCategory(@Query('category') categoryId: string) {
-    return this.productService.get(categoryId);
+    return this.productService.getByCategoryId(categoryId);
+  }
+
+  @Get(':id')
+  getById(@Param('id') id: string) {
+    return this.productService.getById(id);
   }
 
   @Post('create')
