@@ -21,11 +21,11 @@ export class CategoryService {
   }
 
   getAll() {
-    return this.categoryRepo.find({
-      order: {
-        createdAt: 'desc',
-      },
-    });
+    return this.categoryRepo
+      .createQueryBuilder('category')
+      .loadRelationCountAndMap('category.productsCount', 'category.products')
+      .orderBy('category.createdAt', 'DESC')
+      .getMany();
   }
 
   getById(id: string) {
