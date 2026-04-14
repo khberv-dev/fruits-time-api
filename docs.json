@@ -412,6 +412,24 @@
           "response": []
         }
       ]
+    },
+    {
+      "name": "stats",
+      "item": [
+        {
+          "name": "get-summary [ADMIN]",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/stats",
+              "host": ["{{baseUrl}}"],
+              "path": ["stats"]
+            }
+          },
+          "response": []
+        }
+      ]
     }
   ]
 }
