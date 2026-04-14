@@ -139,6 +139,210 @@
             }
           },
           "response": []
+        },
+        {
+          "name": "get-all",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/user?locale=uz&page=1&pageSize=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["user"],
+              "query": [
+                { "key": "locale", "value": "uz", "description": "uz | ru | en" },
+                { "key": "page", "value": "1" },
+                { "key": "pageSize", "value": "10" }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "catalog",
+      "item": [
+        {
+          "name": "get-active",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/catalog?locale=uz",
+              "host": ["{{baseUrl}}"],
+              "path": ["catalog"],
+              "query": [
+                { "key": "locale", "value": "uz", "description": "uz | ru | en" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "get-all",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/catalog/all?locale=uz",
+              "host": ["{{baseUrl}}"],
+              "path": ["catalog", "all"],
+              "query": [
+                { "key": "locale", "value": "uz", "description": "uz | ru | en" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "create",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "title", "value": "Catalog title", "type": "text" },
+                { "key": "file", "type": "file", "src": "" }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/catalog?locale=uz",
+              "host": ["{{baseUrl}}"],
+              "path": ["catalog"],
+              "query": [
+                { "key": "locale", "value": "uz", "description": "uz | ru | en" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "update",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "title", "value": "Updated title", "type": "text" },
+                { "key": "file", "type": "file", "src": "" }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/catalog/:catalogId?locale=uz",
+              "host": ["{{baseUrl}}"],
+              "path": ["catalog", ":catalogId"],
+              "variable": [
+                { "key": "catalogId", "value": "" }
+              ],
+              "query": [
+                { "key": "locale", "value": "uz", "description": "uz | ru | en" }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "product",
+      "item": [
+        {
+          "name": "get-active",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/:catalogId/product?locale=uz",
+              "host": ["{{baseUrl}}"],
+              "path": [":catalogId", "product"],
+              "variable": [
+                { "key": "catalogId", "value": "" }
+              ],
+              "query": [
+                { "key": "locale", "value": "uz", "description": "uz | ru | en" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "get-all",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/:catalogId/product/all?locale=uz",
+              "host": ["{{baseUrl}}"],
+              "path": [":catalogId", "product", "all"],
+              "variable": [
+                { "key": "catalogId", "value": "" }
+              ],
+              "query": [
+                { "key": "locale", "value": "uz", "description": "uz | ru | en" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "create",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "title", "value": "Product title", "type": "text" },
+                { "key": "description", "value": "Product description", "type": "text" },
+                { "key": "compound[0]", "value": "ingredient 1", "type": "text" },
+                { "key": "file", "type": "file", "src": "" }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/:catalogId/product?locale=uz",
+              "host": ["{{baseUrl}}"],
+              "path": [":catalogId", "product"],
+              "variable": [
+                { "key": "catalogId", "value": "" }
+              ],
+              "query": [
+                { "key": "locale", "value": "uz", "description": "uz | ru | en" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "update",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "title", "value": "Updated title", "type": "text" },
+                { "key": "description", "value": "Updated description", "type": "text" },
+                { "key": "compound[0]", "value": "ingredient 1", "type": "text" },
+                { "key": "file", "type": "file", "src": "" }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/:catalogId/product/:productId?locale=uz",
+              "host": ["{{baseUrl}}"],
+              "path": [":catalogId", "product", ":productId"],
+              "variable": [
+                { "key": "catalogId", "value": "" },
+                { "key": "productId", "value": "" }
+              ],
+              "query": [
+                { "key": "locale", "value": "uz", "description": "uz | ru | en" }
+              ]
+            }
+          },
+          "response": []
         }
       ]
     }
