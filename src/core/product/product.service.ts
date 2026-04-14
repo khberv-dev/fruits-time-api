@@ -11,11 +11,13 @@ export class ProductService {
   constructor(@InjectRepository(Product) private readonly productRepo: Repository<Product>) {}
 
   async findAll(catalogId: string, locale: Locale, filterInactive: boolean = true) {
-    const qb = this.productRepo.createQueryBuilder('p').where('c.catalog_id = :catalogId', { catalogId });
+    const qb = this.productRepo.createQueryBuilder('p');
 
     if (filterInactive) {
       qb.where('p.is_active = :isActive', { isActive: true });
     }
+
+    qb.andWhere('p.catalog_id = :catalogId', { catalogId });
 
     const products = await qb.getMany();
 
