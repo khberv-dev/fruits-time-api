@@ -2,6 +2,7 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { User } from '@/shared/entities/user.entity';
 import { Repository } from 'typeorm';
+import { UserRole } from '@/shared/enums/user-role.enum';
 
 @Injectable()
 export class UserService {
@@ -27,6 +28,9 @@ export class UserService {
     const offset = (page - 1) * pageSize;
 
     const [rawUsersList, totalCount] = await this.userRepo.findAndCount({
+      where: {
+        role: UserRole.USER,
+      },
       order: {
         createdAt: 'desc',
       },
