@@ -87,4 +87,8 @@ export class AuthService {
 
     return this.issueTokens(validatedUser.id, validatedUser.role);
   }
+
+  refreshTokens(userId: string, role: UserRole) {
+    return this.issueTokens(userId, role);
+  }
 }

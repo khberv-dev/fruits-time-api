@@ -226,7 +226,7 @@
             "body": {
               "mode": "formdata",
               "formdata": [
-                { "key": "title", "value": "Updated title", "type": "text", "description": "Catalog name for the given locale" },
+                { "key": "title", "value": "Updated title", "type": "text", "description": "Catalog name for the given locale (required)" },
                 { "key": "file", "type": "file", "src": "", "description": "New catalog cover image (optional)" }
               ]
             },
@@ -324,11 +324,11 @@
             "body": {
               "mode": "formdata",
               "formdata": [
-                { "key": "title", "value": "Updated title", "type": "text", "description": "Product name for the given locale" },
-                { "key": "description", "value": "Updated description", "type": "text", "description": "Product description for the given locale" },
-                { "key": "compound[0]", "value": "ingredient 1", "type": "text", "description": "Ingredient list — send multiple compound[n] fields for an array" },
+                { "key": "title", "value": "Updated title", "type": "text", "description": "Product name for the given locale (required)" },
+                { "key": "description", "value": "Updated description", "type": "text", "description": "Product description for the given locale (required)" },
+                { "key": "compound[0]", "value": "ingredient 1", "type": "text", "description": "Ingredient list (required) — send multiple compound[n] fields for an array" },
                 { "key": "compound[1]", "value": "ingredient 2", "type": "text" },
-                { "key": "file", "type": "file", "src": "", "description": "New product image (optional)" }
+                { "key": "file", "type": "file", "src": "", "description": "Product image (required)" }
               ]
             },
             "url": {
