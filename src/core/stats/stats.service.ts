@@ -30,4 +30,22 @@ export class StatsService {
       productCount,
     };
   }
+
+  getUsersTrend(startDate: Date, endDate: Date) {
+    return this.userRepo.query(
+      `
+        SELECT d.date::date AS date,
+      COALESCE(COUNT(u.id), 0)::int AS count
+        FROM generate_series(
+          $1:: date, $2:: date, interval '1 day'
+          ) AS d(date)
+          LEFT JOIN users u
+        ON u.created_at >= d.date
+          AND u.created_at < d.date + interval '1 day' AND u.role = 'user'
+        GROUP BY d.date
+        ORDER BY d.date ASC
+      `,
+      [startDate, endDate],
+    );
+  }
 }

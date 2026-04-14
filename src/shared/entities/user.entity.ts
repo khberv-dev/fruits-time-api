@@ -1,5 +1,6 @@
-import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
+import { Column, CreateDateColumn, Entity, ManyToOne, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
 import { UserRole } from '@/shared/enums/user-role.enum';
+import { Order } from '@/shared/entities/order.entity';
 
 @Entity('users')
 export class User {
@@ -14,6 +15,9 @@ export class User {
 
   @Column()
   password: string;
+
+  @ManyToOne(() => Order, (order) => order.user)
+  orders: Order[];
 
   @Column({ type: 'enum', enum: UserRole })
   role: UserRole;

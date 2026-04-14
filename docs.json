@@ -428,6 +428,23 @@
             }
           },
           "response": []
+        },
+        {
+          "name": "get-users-trend [ADMIN]",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/stats/users-trend?startDate=2026-01-01&endDate=2026-12-31",
+              "host": ["{{baseUrl}}"],
+              "path": ["stats", "users-trend"],
+              "query": [
+                { "key": "startDate", "value": "2026-01-01", "description": "Range start date (ISO 8601, required)" },
+                { "key": "endDate", "value": "2026-12-31", "description": "Range end date (ISO 8601, required)" }
+              ]
+            }
+          },
+          "response": []
         }
       ]
     }
