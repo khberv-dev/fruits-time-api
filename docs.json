@@ -141,7 +141,7 @@
           "response": []
         },
         {
-          "name": "get-all",
+          "name": "get-all [ADMIN]",
           "request": {
             "method": "GET",
             "header": [],
@@ -151,8 +151,8 @@
               "path": ["user"],
               "query": [
                 { "key": "locale", "value": "uz", "description": "uz | ru | en" },
-                { "key": "page", "value": "1" },
-                { "key": "pageSize", "value": "10" }
+                { "key": "page", "value": "1", "description": "Page number (min: 1)" },
+                { "key": "pageSize", "value": "10", "description": "Items per page (max: 50)" }
               ]
             }
           },
@@ -180,7 +180,7 @@
           "response": []
         },
         {
-          "name": "get-all",
+          "name": "get-all [ADMIN]",
           "request": {
             "method": "GET",
             "header": [],
@@ -196,15 +196,15 @@
           "response": []
         },
         {
-          "name": "create",
+          "name": "create [ADMIN]",
           "request": {
             "method": "POST",
             "header": [],
             "body": {
               "mode": "formdata",
               "formdata": [
-                { "key": "title", "value": "Catalog title", "type": "text" },
-                { "key": "file", "type": "file", "src": "" }
+                { "key": "title", "value": "Catalog title", "type": "text", "description": "Catalog name for the given locale (required)" },
+                { "key": "file", "type": "file", "src": "", "description": "Catalog cover image (required)" }
               ]
             },
             "url": {
@@ -212,22 +212,22 @@
               "host": ["{{baseUrl}}"],
               "path": ["catalog"],
               "query": [
-                { "key": "locale", "value": "uz", "description": "uz | ru | en" }
+                { "key": "locale", "value": "uz", "description": "uz | ru | en — locale in which the title is saved" }
               ]
             }
           },
           "response": []
         },
         {
-          "name": "update",
+          "name": "update [ADMIN]",
           "request": {
             "method": "PUT",
             "header": [],
             "body": {
               "mode": "formdata",
               "formdata": [
-                { "key": "title", "value": "Updated title", "type": "text" },
-                { "key": "file", "type": "file", "src": "" }
+                { "key": "title", "value": "Updated title", "type": "text", "description": "Catalog name for the given locale" },
+                { "key": "file", "type": "file", "src": "", "description": "New catalog cover image (optional)" }
               ]
             },
             "url": {
@@ -235,10 +235,10 @@
               "host": ["{{baseUrl}}"],
               "path": ["catalog", ":catalogId"],
               "variable": [
-                { "key": "catalogId", "value": "" }
+                { "key": "catalogId", "value": "", "description": "UUID of the catalog to update" }
               ],
               "query": [
-                { "key": "locale", "value": "uz", "description": "uz | ru | en" }
+                { "key": "locale", "value": "uz", "description": "uz | ru | en — locale in which the title is updated" }
               ]
             }
           },
@@ -259,7 +259,7 @@
               "host": ["{{baseUrl}}"],
               "path": [":catalogId", "product"],
               "variable": [
-                { "key": "catalogId", "value": "" }
+                { "key": "catalogId", "value": "", "description": "UUID of the parent catalog" }
               ],
               "query": [
                 { "key": "locale", "value": "uz", "description": "uz | ru | en" }
@@ -269,7 +269,7 @@
           "response": []
         },
         {
-          "name": "get-all",
+          "name": "get-all [ADMIN]",
           "request": {
             "method": "GET",
             "header": [],
@@ -278,7 +278,7 @@
               "host": ["{{baseUrl}}"],
               "path": [":catalogId", "product", "all"],
               "variable": [
-                { "key": "catalogId", "value": "" }
+                { "key": "catalogId", "value": "", "description": "UUID of the parent catalog" }
               ],
               "query": [
                 { "key": "locale", "value": "uz", "description": "uz | ru | en" }
@@ -288,17 +288,18 @@
           "response": []
         },
         {
-          "name": "create",
+          "name": "create [ADMIN]",
           "request": {
             "method": "POST",
             "header": [],
             "body": {
               "mode": "formdata",
               "formdata": [
-                { "key": "title", "value": "Product title", "type": "text" },
-                { "key": "description", "value": "Product description", "type": "text" },
-                { "key": "compound[0]", "value": "ingredient 1", "type": "text" },
-                { "key": "file", "type": "file", "src": "" }
+                { "key": "title", "value": "Product title", "type": "text", "description": "Product name for the given locale (required)" },
+                { "key": "description", "value": "Product description", "type": "text", "description": "Product description for the given locale (required)" },
+                { "key": "compound[0]", "value": "ingredient 1", "type": "text", "description": "Ingredient list — send multiple compound[n] fields for an array" },
+                { "key": "compound[1]", "value": "ingredient 2", "type": "text" },
+                { "key": "file", "type": "file", "src": "", "description": "Product image (required)" }
               ]
             },
             "url": {
@@ -306,27 +307,28 @@
               "host": ["{{baseUrl}}"],
               "path": [":catalogId", "product"],
               "variable": [
-                { "key": "catalogId", "value": "" }
+                { "key": "catalogId", "value": "", "description": "UUID of the parent catalog" }
               ],
               "query": [
-                { "key": "locale", "value": "uz", "description": "uz | ru | en" }
+                { "key": "locale", "value": "uz", "description": "uz | ru | en — locale in which the fields are saved" }
               ]
             }
           },
           "response": []
         },
         {
-          "name": "update",
+          "name": "update [ADMIN]",
           "request": {
             "method": "PUT",
             "header": [],
             "body": {
               "mode": "formdata",
               "formdata": [
-                { "key": "title", "value": "Updated title", "type": "text" },
-                { "key": "description", "value": "Updated description", "type": "text" },
-                { "key": "compound[0]", "value": "ingredient 1", "type": "text" },
-                { "key": "file", "type": "file", "src": "" }
+                { "key": "title", "value": "Updated title", "type": "text", "description": "Product name for the given locale" },
+                { "key": "description", "value": "Updated description", "type": "text", "description": "Product description for the given locale" },
+                { "key": "compound[0]", "value": "ingredient 1", "type": "text", "description": "Ingredient list — send multiple compound[n] fields for an array" },
+                { "key": "compound[1]", "value": "ingredient 2", "type": "text" },
+                { "key": "file", "type": "file", "src": "", "description": "New product image (optional)" }
               ]
             },
             "url": {
@@ -334,11 +336,11 @@
               "host": ["{{baseUrl}}"],
               "path": [":catalogId", "product", ":productId"],
               "variable": [
-                { "key": "catalogId", "value": "" },
-                { "key": "productId", "value": "" }
+                { "key": "catalogId", "value": "", "description": "UUID of the parent catalog" },
+                { "key": "productId", "value": "", "description": "UUID of the product to update" }
               ],
               "query": [
-                { "key": "locale", "value": "uz", "description": "uz | ru | en" }
+                { "key": "locale", "value": "uz", "description": "uz | ru | en — locale in which the fields are updated" }
               ]
             }
           },
