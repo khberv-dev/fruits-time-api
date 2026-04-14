@@ -26,15 +26,13 @@ export class UserService {
   async findAllPaginate(page: number, pageSize: number) {
     const offset = (page - 1) * pageSize;
 
-    const rawUsersList = await this.userRepo.find({
+    const [rawUsersList, totalCount] = await this.userRepo.findAndCount({
       order: {
         createdAt: 'desc',
       },
       skip: offset,
       take: pageSize,
     });
-
-    const totalCount = await this.userRepo.count();
 
     const users = rawUsersList.map((user) => {
       const { password, ...userData } = user;
@@ -45,7 +43,7 @@ export class UserService {
     return {
       users,
       total: totalCount,
-      pages: Math.round(totalCount / pageSize),
+      pages: Math.ceil(totalCount / pageSize),
     };
   }
 }
