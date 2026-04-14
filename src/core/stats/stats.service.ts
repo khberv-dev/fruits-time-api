@@ -25,11 +25,13 @@ export class StatsService {
 
     const catalogCount = await this.catalogRepo.count();
     const productCount = await this.productRepo.count();
+    const orderCount = await this.orderRepo.count();
 
     return {
       userCount,
       catalogCount,
       productCount,
+      orderCount,
     };
   }
 
