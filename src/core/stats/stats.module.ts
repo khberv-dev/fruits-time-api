@@ -5,9 +5,10 @@ import { User } from '@/shared/entities/user.entity';
 import { Product } from '@/shared/entities/product.entity';
 import { StatsController } from '@/core/stats/stats.controller';
 import { StatsService } from '@/core/stats/stats.service';
+import { Order } from '@/shared/entities/order.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([User, Catalog, Product])],
+  imports: [TypeOrmModule.forFeature([User, Catalog, Product, Order])],
   controllers: [StatsController],
   providers: [StatsService],
 })

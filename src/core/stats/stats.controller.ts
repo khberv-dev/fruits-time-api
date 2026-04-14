@@ -18,4 +18,9 @@ export class StatsController {
   getUsersTrend(@Query() query: DateRangeQuery) {
     return this.statsService.getUsersTrend(query.startDate, query.endDate);
   }
+
+  @Get('orders-trend')
+  getOrdersTrend(@Query() query: DateRangeQuery) {
+    return this.statsService.getOrdersTrend(query.startDate, query.endDate);
+  }
 }
