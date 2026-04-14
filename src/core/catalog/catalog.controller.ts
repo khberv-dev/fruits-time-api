@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Put, Query, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Put, Query, UploadedFile, UseInterceptors } from '@nestjs/common';
 import { CatalogService } from '@/core/catalog/catalog.service';
 import { Role } from '@/common/decorators/role.decorator';
 import { UserRole } from '@/shared/enums/user-role.enum';
@@ -49,6 +49,16 @@ export class CatalogController {
 
     return {
       message: 'Katalog yangilandi',
+    };
+  }
+
+  @Delete(':catalogId')
+  @Role(UserRole.ADMIN)
+  async delete(@Param('catalogId') catalogId: string) {
+    await this.catalogService.delete(catalogId);
+
+    return {
+      message: "Katalog o'chirildi",
     };
   }
 }

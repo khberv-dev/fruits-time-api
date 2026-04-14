@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Put, Query, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Put, Query, UploadedFile, UseInterceptors } from '@nestjs/common';
 import { ProductService } from '@/core/product/product.service';
 import { BasicQuery } from '@/shared/dto/basic-query.dto';
 import { Role } from '@/common/decorators/role.decorator';
@@ -50,6 +50,16 @@ export class ProductController {
 
     return {
       message: 'Produkt yaratildi',
+    };
+  }
+
+  @Delete(':productId')
+  @Role(UserRole.ADMIN)
+  async delete(@Param('productId') productId: string) {
+    await this.productService.delete(productId);
+
+    return {
+      message: "Produkt o'chirildi",
     };
   }
 }

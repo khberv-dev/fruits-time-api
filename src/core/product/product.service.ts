@@ -70,4 +70,8 @@ export class ProductService {
 
     return this.productRepo.save(product);
   }
+
+  delete(productId: string) {
+    return this.productRepo.delete(productId);
+  }
 }

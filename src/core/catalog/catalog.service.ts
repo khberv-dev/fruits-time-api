@@ -59,4 +59,19 @@ export class CatalogService {
 
     return this.catalogRepo.save(catalog);
   }
+
+  async delete(catalogId: string) {
+    const catalog = await this.catalogRepo.findOne({
+      where: {
+        id: catalogId,
+      },
+      relations: ['products'],
+    });
+
+    if (!catalog || catalog.products.length > 0) {
+      throw new BadRequestException("Katalog bo'sh emas");
+    }
+
+    return this.catalogRepo.delete(catalogId);
+  }
 }
