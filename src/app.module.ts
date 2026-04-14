@@ -7,6 +7,7 @@ import { AuthModule } from '@/core/auth/auth.module';
 import { APP_GUARD } from '@nestjs/core';
 import { JwtAccessGuard } from '@/common/guards/jwt-access.guard';
 import { UserModule } from '@/core/user/user.module';
+import { CatalogModule } from '@/core/catalog/catalog.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { UserModule } from '@/core/user/user.module';
     TypeOrmModule.forRoot(dataSource.options),
     AuthModule,
     UserModule,
+    CatalogModule,
   ],
   controllers: [AppController],
   providers: [

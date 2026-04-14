@@ -1,0 +1,27 @@
+import { Column, CreateDateColumn, Entity, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
+import type { Localized } from '@/shared/types/localized.type';
+import { Product } from '@/shared/entities/product.entity';
+
+@Entity('catalogs')
+export class Catalog {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
+
+  @Column()
+  image: string;
+
+  @Column({ type: 'jsonb', default: {} })
+  title: Localized<string>;
+
+  @OneToMany(() => Product, (product) => product.catalog)
+  products: Product[];
+
+  @Column({ name: 'is_active' })
+  isActive: boolean;
+
+  @CreateDateColumn({ name: 'created_at' })
+  createdAt: Date;
+
+  @CreateDateColumn({ name: 'updated_at' })
+  updatedAt: Date;
+}
