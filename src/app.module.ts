@@ -8,6 +8,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { JwtAccessGuard } from '@/common/guards/jwt-access.guard';
 import { UserModule } from '@/core/user/user.module';
 import { CatalogModule } from '@/core/catalog/catalog.module';
+import { ProductModule } from '@/core/product/product.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { CatalogModule } from '@/core/catalog/catalog.module';
     AuthModule,
     UserModule,
     CatalogModule,
+    ProductModule,
   ],
   controllers: [AppController],
   providers: [
