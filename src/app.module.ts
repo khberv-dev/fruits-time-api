@@ -9,6 +9,7 @@ import { JwtAccessGuard } from '@/common/guards/jwt-access.guard';
 import { UserModule } from '@/core/user/user.module';
 import { CatalogModule } from '@/core/catalog/catalog.module';
 import { ProductModule } from '@/core/product/product.module';
+import { RoleGuard } from '@/common/guards/role.guard';
 
 @Module({
   imports: [
@@ -26,6 +27,10 @@ import { ProductModule } from '@/core/product/product.module';
     {
       provide: APP_GUARD,
       useClass: JwtAccessGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: RoleGuard,
     },
   ],
 })

@@ -6,7 +6,7 @@ import { JwtService } from '@nestjs/jwt';
 import { UserRole } from '@/shared/enums/user-role.enum';
 import { ConfigService } from '@nestjs/config';
 import { CreateUserRequest } from '@/core/auth/dto/create-user-request.dto';
-import { validatePassword } from '@/shared/utils/lib';
+import { encryptPassword, validatePassword } from '@/shared/utils/lib';
 import { SignInRequest } from '@/core/auth/dto/sign-in-request.dto';
 
 @Injectable()
@@ -61,10 +61,12 @@ export class AuthService {
       throw new ConflictException('Boshqa telefon raqam kiriting');
     }
 
+    const passwordHash = await encryptPassword(data.password);
+
     const user = await this.userRepo.save({
       firstName: data.firstName,
       phoneNumber: data.phoneNumber,
-      password: data.password,
+      password: passwordHash,
       role: UserRole.USER,
     });
 
