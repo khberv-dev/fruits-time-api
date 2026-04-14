@@ -275,6 +275,22 @@
             }
           },
           "response": []
+        },
+        {
+          "name": "delete [ADMIN]",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/catalog/:catalogId",
+              "host": ["{{baseUrl}}"],
+              "path": ["catalog", ":catalogId"],
+              "variable": [
+                { "key": "catalogId", "value": "", "description": "UUID of the catalog to delete" }
+              ]
+            }
+          },
+          "response": []
         }
       ]
     },
@@ -360,7 +376,7 @@
                 { "key": "description", "value": "Updated description", "type": "text", "description": "Product description for the given locale (required)" },
                 { "key": "compound[0]", "value": "ingredient 1", "type": "text", "description": "Ingredient list (required) — send multiple compound[n] fields for an array" },
                 { "key": "compound[1]", "value": "ingredient 2", "type": "text" },
-                { "key": "file", "type": "file", "src": "", "description": "Product image (required)" }
+                { "key": "file", "type": "file", "src": "", "description": "New product image (optional)" }
               ]
             },
             "url": {
@@ -373,6 +389,23 @@
               ],
               "query": [
                 { "key": "locale", "value": "uz", "description": "uz | ru | en — locale in which the fields are updated" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "delete [ADMIN]",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/:catalogId/product/:productId",
+              "host": ["{{baseUrl}}"],
+              "path": [":catalogId", "product", ":productId"],
+              "variable": [
+                { "key": "catalogId", "value": "", "description": "UUID of the parent catalog" },
+                { "key": "productId", "value": "", "description": "UUID of the product to delete" }
               ]
             }
           },
