@@ -11,17 +11,23 @@ export class CatalogService {
   constructor(@InjectRepository(Catalog) private readonly catalogRepo: Repository<Catalog>) {}
 
   async findAll(locale: Locale, filterInactive: boolean = true) {
-    const qb = this.catalogRepo.createQueryBuilder('c');
+    const qb = this.catalogRepo
+      .createQueryBuilder('c')
+      .leftJoin('c.products', 'p')
+      .addSelect('COUNT(p.id)', 'productCount');
 
     if (filterInactive) {
       qb.where('c.is_active = :isActive', { isActive: true });
     }
 
-    const catalogs = await qb.getMany();
+    qb.groupBy('c.id');
 
-    return catalogs.map((catalog) => ({
+    const { entities: catalogs, raw } = await qb.getRawAndEntities();
+
+    return catalogs.map((catalog, index) => ({
       ...catalog,
       title: catalog.title[locale],
+      productCount: raw[index]['productCount'],
     }));
   }
 
