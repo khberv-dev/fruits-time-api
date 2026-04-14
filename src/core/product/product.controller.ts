@@ -46,7 +46,7 @@ export class ProductController {
     @UploadedFile() file: Express.Multer.File,
     @Body() body: CreateProductRequest,
   ) {
-    await this.productService.update(productId, query.locale, file.filename, body);
+    await this.productService.update(productId, query.locale, file?.filename, body);
 
     return {
       message: 'Produkt yaratildi',
