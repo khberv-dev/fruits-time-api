@@ -23,7 +23,7 @@ export class Product {
   @JoinColumn({ name: 'catalog_id' })
   catalog: Catalog;
 
-  @Column({ name: 'is_active' })
+  @Column({ name: 'is_active', default: true })
   isActive: boolean;
 
   @CreateDateColumn({ name: 'created_at' })

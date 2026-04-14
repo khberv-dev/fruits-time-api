@@ -16,7 +16,7 @@ export class Catalog {
   @OneToMany(() => Product, (product) => product.catalog)
   products: Product[];
 
-  @Column({ name: 'is_active' })
+  @Column({ name: 'is_active', default: true })
   isActive: boolean;
 
   @CreateDateColumn({ name: 'created_at' })
