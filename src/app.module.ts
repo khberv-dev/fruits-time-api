@@ -10,6 +10,7 @@ import { UserModule } from '@/core/user/user.module';
 import { CatalogModule } from '@/core/catalog/catalog.module';
 import { ProductModule } from '@/core/product/product.module';
 import { RoleGuard } from '@/common/guards/role.guard';
+import { ServeStaticModule } from '@nestjs/serve-static';
 
 @Module({
   imports: [
@@ -17,6 +18,10 @@ import { RoleGuard } from '@/common/guards/role.guard';
       isGlobal: true,
     }),
     TypeOrmModule.forRoot(dataSource.options),
+    ServeStaticModule.forRoot({
+      rootPath: 'uploads',
+      serveRoot: '/public',
+    }),
     AuthModule,
     UserModule,
     CatalogModule,
