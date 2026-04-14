@@ -11,6 +11,7 @@ import { CatalogModule } from '@/core/catalog/catalog.module';
 import { ProductModule } from '@/core/product/product.module';
 import { RoleGuard } from '@/common/guards/role.guard';
 import { ServeStaticModule } from '@nestjs/serve-static';
+import { StatsModule } from '@/core/stats/stats.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { ServeStaticModule } from '@nestjs/serve-static';
     UserModule,
     CatalogModule,
     ProductModule,
+    StatsModule,
   ],
   controllers: [AppController],
   providers: [
