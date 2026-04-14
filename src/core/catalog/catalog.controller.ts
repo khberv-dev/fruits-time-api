@@ -1,9 +1,10 @@
-import { Body, Controller, Get, Param, Post, Put, Query, UploadedFile } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Put, Query, UploadedFile, UseInterceptors } from '@nestjs/common';
 import { CatalogService } from '@/core/catalog/catalog.service';
 import { Role } from '@/common/decorators/role.decorator';
 import { UserRole } from '@/shared/enums/user-role.enum';
 import { BasicQuery } from '@/shared/dto/basic-query.dto';
 import { CreateCatalogRequest } from '@/core/catalog/dto/create-catalog-request.dto';
+import { uploadFileInterceptor } from '@/common/interceptors/upload-file.interceptor';
 
 @Controller('catalog')
 export class CatalogController {
@@ -21,6 +22,7 @@ export class CatalogController {
   }
 
   @Post()
+  @UseInterceptors(uploadFileInterceptor('catalog'))
   @Role(UserRole.ADMIN)
   async create(
     @Query() query: BasicQuery,
@@ -35,6 +37,7 @@ export class CatalogController {
   }
 
   @Put(':catalogId')
+  @UseInterceptors(uploadFileInterceptor('catalog'))
   @Role(UserRole.ADMIN)
   async update(
     @Param('catalogId') catalogId: string,

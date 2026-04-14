@@ -1,9 +1,10 @@
-import { Body, Controller, Get, Param, Post, Put, Query, UploadedFile } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Put, Query, UploadedFile, UseInterceptors } from '@nestjs/common';
 import { ProductService } from '@/core/product/product.service';
 import { BasicQuery } from '@/shared/dto/basic-query.dto';
 import { Role } from '@/common/decorators/role.decorator';
 import { UserRole } from '@/shared/enums/user-role.enum';
 import { CreateProductRequest } from '@/core/product/dto/create-product-request.dto';
+import { uploadFileInterceptor } from '@/common/interceptors/upload-file.interceptor';
 
 @Controller(':catalogId/product')
 export class ProductController {
@@ -21,6 +22,7 @@ export class ProductController {
   }
 
   @Post()
+  @UseInterceptors(uploadFileInterceptor('product'))
   @Role(UserRole.ADMIN)
   async create(
     @Param('catalogId') catalogId: string,
@@ -36,6 +38,7 @@ export class ProductController {
   }
 
   @Put(':productId')
+  @UseInterceptors(uploadFileInterceptor('product'))
   @Role(UserRole.ADMIN)
   async update(
     @Param('productId') productId: string,
