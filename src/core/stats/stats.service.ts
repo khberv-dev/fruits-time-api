@@ -17,21 +17,21 @@ export class StatsService {
   ) {}
 
   async getSummary() {
-    const userCount = await this.userRepo.count({
+    const usersCount = await this.userRepo.count({
       where: {
         role: UserRole.USER,
       },
     });
 
-    const catalogCount = await this.catalogRepo.count();
-    const productCount = await this.productRepo.count();
-    const orderCount = await this.orderRepo.count();
+    const catalogsCount = await this.catalogRepo.count();
+    const productsCount = await this.productRepo.count();
+    const ordersCount = await this.orderRepo.count();
 
     return {
-      userCount,
-      catalogCount,
-      productCount,
-      orderCount,
+      usersCount,
+      catalogsCount,
+      productsCount,
+      ordersCount,
     };
   }
 

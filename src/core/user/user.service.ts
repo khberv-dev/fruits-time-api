@@ -27,7 +27,7 @@ export class UserService {
   async findAllPaginate(page: number, pageSize: number) {
     const offset = (page - 1) * pageSize;
 
-    const [rawUsersList, totalCount] = await this.userRepo.findAndCount({
+    const [rawUsersList, usersCount] = await this.userRepo.findAndCount({
       where: {
         role: UserRole.USER,
       },
@@ -46,8 +46,8 @@ export class UserService {
 
     return {
       users,
-      total: totalCount,
-      pages: Math.ceil(totalCount / pageSize),
+      total: usersCount,
+      pages: Math.ceil(usersCount / pageSize),
     };
   }
 }

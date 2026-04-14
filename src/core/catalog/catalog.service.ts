@@ -14,7 +14,7 @@ export class CatalogService {
     const qb = this.catalogRepo
       .createQueryBuilder('c')
       .leftJoin('c.products', 'p')
-      .addSelect('COUNT(p.id)', 'productCount');
+      .addSelect('COUNT(p.id)', 'productsCount');
 
     if (filterInactive) {
       qb.where('c.is_active = :isActive', { isActive: true });
@@ -27,7 +27,7 @@ export class CatalogService {
     return catalogs.map((catalog, index) => ({
       ...catalog,
       title: catalog.title[locale],
-      productCount: raw[index]['productCount'],
+      productsCount: raw[index]['productsCount'],
     }));
   }
 
