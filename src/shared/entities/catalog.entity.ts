@@ -1,4 +1,4 @@
-import { Column, CreateDateColumn, Entity, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
+import { Column, CreateDateColumn, Entity, OneToMany, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
 import type { Localized } from '@/shared/types/localized.type';
 import { Product } from '@/shared/entities/product.entity';
 
@@ -22,6 +22,6 @@ export class Catalog {
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 
-  @CreateDateColumn({ name: 'updated_at' })
+  @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
 }
