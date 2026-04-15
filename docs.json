@@ -491,6 +491,95 @@
           "response": []
         }
       ]
+    },
+    {
+      "name": "banner",
+      "item": [
+        {
+          "name": "get-active",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/banner?locale=uz",
+              "host": ["{{baseUrl}}"],
+              "path": ["banner"],
+              "query": [
+                { "key": "locale", "value": "uz", "description": "uz | ru | en" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "get-all [ADMIN]",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/banner/all?locale=uz",
+              "host": ["{{baseUrl}}"],
+              "path": ["banner", "all"],
+              "query": [
+                { "key": "locale", "value": "uz", "description": "uz | ru | en" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "create [ADMIN]",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "title", "value": "Banner title", "type": "text", "description": "Banner title for the given locale (required)" },
+                { "key": "content", "value": "Banner content", "type": "text", "description": "Banner body text for the given locale (required)" },
+                { "key": "file", "type": "file", "src": "", "description": "Banner image (required)" }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/banner?locale=uz",
+              "host": ["{{baseUrl}}"],
+              "path": ["banner"],
+              "query": [
+                { "key": "locale", "value": "uz", "description": "uz | ru | en — locale in which the fields are saved" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "update [ADMIN]",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "title", "value": "Updated title", "type": "text", "description": "Banner title for the given locale (optional)" },
+                { "key": "content", "value": "Updated content", "type": "text", "description": "Banner body text for the given locale (optional)" },
+                { "key": "isActive", "value": "true", "type": "text", "description": "Toggle banner visibility: true | false (optional)" },
+                { "key": "file", "type": "file", "src": "", "description": "New banner image (optional)" }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/banner/:bannerId?locale=uz",
+              "host": ["{{baseUrl}}"],
+              "path": ["banner", ":bannerId"],
+              "variable": [
+                { "key": "bannerId", "value": "", "description": "UUID of the banner to update" }
+              ],
+              "query": [
+                { "key": "locale", "value": "uz", "description": "uz | ru | en — locale in which the fields are updated" }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
     }
   ]
 }
