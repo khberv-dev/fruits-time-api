@@ -5,6 +5,7 @@ import { UserRole } from '@/shared/enums/user-role.enum';
 import { BasicQuery } from '@/shared/dto/basic-query.dto';
 import { CreateCatalogRequest } from '@/core/catalog/dto/create-catalog-request.dto';
 import { uploadFileInterceptor } from '@/common/interceptors/upload-file.interceptor';
+import { UpdateCatalogRequest } from '@/core/catalog/dto/update-catalog-request.dto';
 
 @Controller('catalog')
 export class CatalogController {
@@ -43,7 +44,7 @@ export class CatalogController {
     @Param('catalogId') catalogId: string,
     @Query() query: BasicQuery,
     @UploadedFile() file: Express.Multer.File,
-    @Body() body: CreateCatalogRequest,
+    @Body() body: UpdateCatalogRequest,
   ) {
     await this.catalogService.update(catalogId, query.locale, file?.filename, body);
 

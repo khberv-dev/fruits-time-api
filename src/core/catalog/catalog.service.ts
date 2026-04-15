@@ -57,6 +57,10 @@ export class CatalogService {
       catalog.title = { ...catalog.title, [locale]: data.title };
     }
 
+    if (data.isActive != undefined) {
+      catalog.isActive = data.isActive;
+    }
+
     return this.catalogRepo.save(catalog);
   }
 

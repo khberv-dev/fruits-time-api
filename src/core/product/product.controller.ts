@@ -5,6 +5,7 @@ import { Role } from '@/common/decorators/role.decorator';
 import { UserRole } from '@/shared/enums/user-role.enum';
 import { CreateProductRequest } from '@/core/product/dto/create-product-request.dto';
 import { uploadFileInterceptor } from '@/common/interceptors/upload-file.interceptor';
+import { UpdateProductRequest } from '@/core/product/dto/update-product-request.dto';
 
 @Controller(':catalogId/product')
 export class ProductController {
@@ -44,7 +45,7 @@ export class ProductController {
     @Param('productId') productId: string,
     @Query() query: BasicQuery,
     @UploadedFile() file: Express.Multer.File,
-    @Body() body: CreateProductRequest,
+    @Body() body: UpdateProductRequest,
   ) {
     await this.productService.update(productId, query.locale, file?.filename, body);
 

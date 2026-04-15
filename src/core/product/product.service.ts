@@ -73,6 +73,10 @@ export class ProductService {
       product.price = data.price;
     }
 
+    if (data.isActive != undefined) {
+      product.isActive = data.isActive;
+    }
+
     return this.productRepo.save(product);
   }
 
