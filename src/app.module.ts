@@ -12,6 +12,7 @@ import { ProductModule } from '@/core/product/product.module';
 import { RoleGuard } from '@/common/guards/role.guard';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { StatsModule } from '@/core/stats/stats.module';
+import { AssistantModule } from '@/core/assistant/assistant.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { StatsModule } from '@/core/stats/stats.module';
     CatalogModule,
     ProductModule,
     StatsModule,
+    AssistantModule,
   ],
   controllers: [AppController],
   providers: [
