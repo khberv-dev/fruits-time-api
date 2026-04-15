@@ -27,6 +27,9 @@ export class Product {
   @Column({ type: 'jsonb', default: {} })
   compound: Localized<string[]>;
 
+  @Column({ default: 0 })
+  price: number;
+
   @ManyToOne(() => Catalog, (catalog) => catalog.products)
   @JoinColumn({ name: 'catalog_id' })
   catalog: Catalog;

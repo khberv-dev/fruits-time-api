@@ -34,6 +34,7 @@ export class ProductService {
       title: { [locale]: data.title },
       description: { [locale]: data.description },
       compound: { [locale]: data.compound },
+      price: data.price,
       image: fileName,
       catalog: {
         id: catalogId,
@@ -66,6 +67,10 @@ export class ProductService {
 
     if (data.compound) {
       product.compound = { ...product.compound, [locale]: data.compound };
+    }
+
+    if (data.price) {
+      product.price = data.price;
     }
 
     return this.productRepo.save(product);

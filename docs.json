@@ -347,6 +347,7 @@
                 { "key": "description", "value": "Product description", "type": "text", "description": "Product description for the given locale (required)" },
                 { "key": "compound[0]", "value": "ingredient 1", "type": "text", "description": "Ingredient list — send multiple compound[n] fields for an array" },
                 { "key": "compound[1]", "value": "ingredient 2", "type": "text" },
+                { "key": "price", "value": "0", "type": "text", "description": "Price in minimal currency unit, integer >= 0 (required)" },
                 { "key": "file", "type": "file", "src": "", "description": "Product image (required)" }
               ]
             },
@@ -376,6 +377,7 @@
                 { "key": "description", "value": "Updated description", "type": "text", "description": "Product description for the given locale (required)" },
                 { "key": "compound[0]", "value": "ingredient 1", "type": "text", "description": "Ingredient list (required) — send multiple compound[n] fields for an array" },
                 { "key": "compound[1]", "value": "ingredient 2", "type": "text" },
+                { "key": "price", "value": "0", "type": "text", "description": "Price in minimal currency unit, integer >= 0 (required)" },
                 { "key": "file", "type": "file", "src": "", "description": "New product image (optional)" }
               ]
             },
@@ -459,6 +461,31 @@
                 { "key": "startDate", "value": "2026-01-01", "description": "Range start date (ISO 8601, required)" },
                 { "key": "endDate", "value": "2026-12-31", "description": "Range end date (ISO 8601, required)" }
               ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "assistant",
+      "item": [
+        {
+          "name": "ask",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"Your question here\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/assistant/ask",
+              "host": ["{{baseUrl}}"],
+              "path": ["assistant", "ask"]
             }
           },
           "response": []
