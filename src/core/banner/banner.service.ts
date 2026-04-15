@@ -10,14 +10,20 @@ import { UpdateBannerRequest } from '@/core/banner/dto/update-banner-request.dto
 export class BannerService {
   constructor(@InjectRepository(Banner) private readonly bannerRepo: Repository<Banner>) {}
 
-  findAll(locale: Locale, filterInactive: boolean = true) {
+  async findAll(locale: Locale, filterInactive: boolean = true) {
     const qb = this.bannerRepo.createQueryBuilder('b');
 
     if (filterInactive) {
       qb.where('b.is_active = :isActive', { isActive: true });
     }
 
-    return qb.getMany();
+    const banners = await qb.getMany();
+    return banners.map((banner) => ({
+      ...banner,
+      title: banner.title[locale],
+      content: banner.content[locale],
+      image: banner.image[locale],
+    }));
   }
 
   create(locale: Locale, fileName: string, data: CreateBannerRequest) {
