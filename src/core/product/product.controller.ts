@@ -49,7 +49,7 @@ export class ProductController {
     await this.productService.update(productId, query.locale, file?.filename, body);
 
     return {
-      message: 'Produkt yaratildi',
+      message: 'Produkt yangilandi',
     };
   }
 
