@@ -22,8 +22,8 @@ export class CatalogController {
   }
 
   @Post()
-  @UseInterceptors(uploadFileInterceptor('catalog'))
   @Role(UserRole.ADMIN)
+  @UseInterceptors(uploadFileInterceptor('catalog'))
   async create(
     @Query() query: BasicQuery,
     @UploadedFile() file: Express.Multer.File,
@@ -37,8 +37,8 @@ export class CatalogController {
   }
 
   @Put(':catalogId')
-  @UseInterceptors(uploadFileInterceptor('catalog'))
   @Role(UserRole.ADMIN)
+  @UseInterceptors(uploadFileInterceptor('catalog'))
   async update(
     @Param('catalogId') catalogId: string,
     @Query() query: BasicQuery,

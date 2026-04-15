@@ -22,8 +22,8 @@ export class ProductController {
   }
 
   @Post()
-  @UseInterceptors(uploadFileInterceptor('product'))
   @Role(UserRole.ADMIN)
+  @UseInterceptors(uploadFileInterceptor('product'))
   async create(
     @Param('catalogId') catalogId: string,
     @Query() query: BasicQuery,
@@ -38,8 +38,8 @@ export class ProductController {
   }
 
   @Put(':productId')
-  @UseInterceptors(uploadFileInterceptor('product'))
   @Role(UserRole.ADMIN)
+  @UseInterceptors(uploadFileInterceptor('product'))
   async update(
     @Param('productId') productId: string,
     @Query() query: BasicQuery,
