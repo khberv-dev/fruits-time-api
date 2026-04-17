@@ -6,12 +6,14 @@ import { UserRole } from '@/shared/enums/user-role.enum';
 import { uploadFileInterceptor } from '@/common/interceptors/upload-file.interceptor';
 import { CreateBannerRequest } from '@/core/banner/dto/create-banner-request.dto';
 import { UpdateBannerRequest } from '@/core/banner/dto/update-banner-request.dto';
+import { IsPublic } from '@/common/decorators/is_public.decorator';
 
 @Controller('banner')
 export class BannerController {
   constructor(private readonly bannerService: BannerService) {}
 
   @Get()
+  @IsPublic()
   get(@Query() query: BasicQuery) {
     return this.bannerService.findAll(query.locale);
   }

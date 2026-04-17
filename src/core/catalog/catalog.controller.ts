@@ -6,12 +6,14 @@ import { BasicQuery } from '@/shared/dto/basic-query.dto';
 import { CreateCatalogRequest } from '@/core/catalog/dto/create-catalog-request.dto';
 import { uploadFileInterceptor } from '@/common/interceptors/upload-file.interceptor';
 import { UpdateCatalogRequest } from '@/core/catalog/dto/update-catalog-request.dto';
+import { IsPublic } from '@/common/decorators/is_public.decorator';
 
 @Controller('catalog')
 export class CatalogController {
   constructor(private readonly catalogService: CatalogService) {}
 
   @Get()
+  @IsPublic()
   get(@Query() query: BasicQuery) {
     return this.catalogService.findAll(query.locale);
   }

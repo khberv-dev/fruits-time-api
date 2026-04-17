@@ -7,7 +7,7 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
-import type { Localized } from '@/shared/types/localized.type';
+import { Localized } from '@/shared/types/localized.type';
 import { Catalog } from '@/shared/entities/catalog.entity';
 
 @Entity('products')
@@ -18,13 +18,13 @@ export class Product {
   @Column()
   image: string;
 
-  @Column({ type: 'jsonb', default: {} })
+  @Column({ type: 'jsonb', default: Localized.defaultString })
   title: Localized<string>;
 
-  @Column({ type: 'jsonb', default: {} })
+  @Column({ type: 'jsonb', default: Localized.defaultString })
   description: Localized<string>;
 
-  @Column({ type: 'jsonb', default: {} })
+  @Column({ type: 'jsonb', default: Localized.defaultString })
   compound: Localized<string[]>;
 
   @Column({ default: 0 })

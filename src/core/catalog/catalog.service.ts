@@ -26,8 +26,8 @@ export class CatalogService {
 
     return catalogs.map((catalog, index) => ({
       ...catalog,
-      title: catalog.title[locale],
-      productsCount: raw[index]['productsCount'],
+      title: catalog.title[locale] || 'N/A',
+      productsCount: Number(raw[index]['productsCount']),
     }));
   }
 
