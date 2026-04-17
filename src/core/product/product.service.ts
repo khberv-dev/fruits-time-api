@@ -23,9 +23,9 @@ export class ProductService {
 
     return products.map((product) => ({
       ...product,
-      title: product.title[locale] || 'N/A',
-      description: product.description[locale] || 'N/A',
-      compound: product.compound[locale] || 'N/A',
+      title: product.title[locale],
+      description: product.description[locale],
+      compound: product.compound[locale],
     }));
   }
 
