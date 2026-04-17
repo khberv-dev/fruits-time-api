@@ -6,12 +6,14 @@ import { UserRole } from '@/shared/enums/user-role.enum';
 import { CreateProductRequest } from '@/core/product/dto/create-product-request.dto';
 import { uploadFileInterceptor } from '@/common/interceptors/upload-file.interceptor';
 import { UpdateProductRequest } from '@/core/product/dto/update-product-request.dto';
+import { IsPublic } from '@/common/decorators/is_public.decorator';
 
 @Controller(':catalogId/product')
 export class ProductController {
   constructor(private readonly productService: ProductService) {}
 
   @Get()
+  @IsPublic()
   get(@Param('catalogId') catalogId: string, @Query() query: BasicQuery) {
     return this.productService.findAll(catalogId, query.locale);
   }
