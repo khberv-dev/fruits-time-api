@@ -8,7 +8,7 @@ import { uploadFileInterceptor } from '@/common/interceptors/upload-file.interce
 import { UpdateProductRequest } from '@/core/product/dto/update-product-request.dto';
 import { IsPublic } from '@/common/decorators/is_public.decorator';
 
-@Controller(':catalogId/product')
+@Controller('catalog/:catalogId/product')
 export class ProductController {
   constructor(private readonly productService: ProductService) {}
 

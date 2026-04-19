@@ -3,6 +3,7 @@ import { AppModule } from './app.module';
 import { ConfigService } from '@nestjs/config';
 import { Logger } from '@nestjs/common';
 import { validationPipe } from '@/common/pipes/validation.pipe';
+import { randomOTP } from '@/shared/utils/lib';
 
 async function bootstrap() {
   const logger = new Logger('App');

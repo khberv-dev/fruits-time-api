@@ -7,3 +7,9 @@ export function encryptPassword(password: string) {
 export function validatePassword(password: string, hash: string) {
   return bcrypt.compare(password, hash);
 }
+
+export function randomOTP() {
+  return Math.round(Math.random() * 100000)
+    .toString()
+    .padStart(5, '0');
+}

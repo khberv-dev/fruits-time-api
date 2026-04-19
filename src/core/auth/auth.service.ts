@@ -6,13 +6,18 @@ import { JwtService } from '@nestjs/jwt';
 import { UserRole } from '@/shared/enums/user-role.enum';
 import { ConfigService } from '@nestjs/config';
 import { CreateUserRequest } from '@/core/auth/dto/create-user-request.dto';
-import { encryptPassword, validatePassword } from '@/shared/utils/lib';
+import { encryptPassword, randomOTP, validatePassword } from '@/shared/utils/lib';
 import { SignInRequest } from '@/core/auth/dto/sign-in-request.dto';
+import { SendOtpRequest } from '@/core/auth/dto/send-otp-request.dto';
+import { Otp } from '@/shared/entities/otp.entity';
+import { VerifyOtpRequest } from '@/core/auth/dto/verify-otp-request.dto';
+import dayjs from 'dayjs';
 
 @Injectable()
 export class AuthService {
   constructor(
     @InjectRepository(User) private readonly userRepo: Repository<User>,
+    @InjectRepository(Otp) private readonly otpRepo: Repository<Otp>,
     private readonly jwtService: JwtService,
     private readonly config: ConfigService,
   ) {}
@@ -90,5 +95,49 @@ export class AuthService {
 
   refreshTokens(userId: string, role: UserRole) {
     return this.issueTokens(userId, role);
+  }
+
+  checkPhoneNumber(phoneNumber: string) {
+    return this.userRepo.exists({
+      where: {
+        phoneNumber,
+      },
+    });
+  }
+
+  async sendOtp(data: SendOtpRequest) {
+    const code = randomOTP();
+
+    return this.otpRepo.save({
+      phoneNumber: data.phoneNumber,
+      code: code,
+      expiresAt: dayjs().add(15, 'minutes'),
+    });
+  }
+
+  async verifyOtp(otpId: string, data: VerifyOtpRequest) {
+    const now = dayjs();
+    const otp = await this.otpRepo.findOne({
+      where: {
+        id: otpId,
+      },
+    });
+
+    if (!otp || dayjs(otp.expiresAt).isAfter(now) || otp.attempts === 0) {
+      throw new BadRequestException('Wrong session ID');
+    }
+
+    const isCodeValid = otp.code === data.code;
+
+    if (!isCodeValid) {
+      otp.attempts--;
+      await this.otpRepo.save(otp);
+
+      throw new BadRequestException('SMS kod xato');
+    }
+
+    otp.verifiedAt = now.toDate();
+
+    await this.otpRepo.save(otp);
   }
 }

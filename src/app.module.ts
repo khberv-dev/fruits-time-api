@@ -24,6 +24,9 @@ import { BannerModule } from '@/core/banner/banner.module';
     ServeStaticModule.forRoot({
       rootPath: 'uploads',
       serveRoot: '/public',
+      serveStaticOptions: {
+        fallthrough: false,
+      },
     }),
     AuthModule,
     UserModule,

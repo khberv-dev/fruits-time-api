@@ -198,6 +198,7 @@
         {
           "name": "get-active",
           "request": {
+            "auth": { "type": "noauth" },
             "method": "GET",
             "header": [],
             "url": {
@@ -300,12 +301,13 @@
         {
           "name": "get-active",
           "request": {
+            "auth": { "type": "noauth" },
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/:catalogId/product?locale=uz",
+              "raw": "{{baseUrl}}/catalog/:catalogId/product?locale=uz",
               "host": ["{{baseUrl}}"],
-              "path": [":catalogId", "product"],
+              "path": ["catalog", ":catalogId", "product"],
               "variable": [
                 { "key": "catalogId", "value": "", "description": "UUID of the parent catalog" }
               ],
@@ -498,6 +500,7 @@
         {
           "name": "get-active",
           "request": {
+            "auth": { "type": "noauth" },
             "method": "GET",
             "header": [],
             "url": {

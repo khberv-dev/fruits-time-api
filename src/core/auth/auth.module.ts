@@ -7,6 +7,7 @@ import { AuthController } from '@/core/auth/auth.controller';
 import { AuthService } from '@/core/auth/auth.service';
 import { JwtAccessStrategy } from '@/core/auth/strategies/jwt-access.strategy';
 import { JwtRefreshStrategy } from '@/core/auth/strategies/jwt-refresh.strategy';
+import { Otp } from '@/shared/entities/otp.entity';
 
 @Module({
   imports: [
@@ -19,7 +20,7 @@ import { JwtRefreshStrategy } from '@/core/auth/strategies/jwt-refresh.strategy'
         },
       }),
     }),
-    TypeOrmModule.forFeature([User]),
+    TypeOrmModule.forFeature([User, Otp]),
   ],
   controllers: [AuthController],
   providers: [JwtAccessStrategy, JwtRefreshStrategy, AuthService],
