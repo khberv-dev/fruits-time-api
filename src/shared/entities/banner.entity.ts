@@ -6,13 +6,13 @@ export class Banner {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ type: 'jsonb', default: Localized.defaultString })
+  @Column({ type: 'jsonb', default: {} })
   image: Localized<string>;
 
-  @Column({ type: 'jsonb', default: Localized.defaultString })
+  @Column({ type: 'jsonb', default: {} })
   title: Localized<string>;
 
-  @Column({ type: 'jsonb', default: Localized.defaultString })
+  @Column({ type: 'jsonb', default: {} })
   content: Localized<string>;
 
   @Column({ name: 'is_active', default: false })

@@ -18,13 +18,13 @@ export class Product {
   @Column()
   image: string;
 
-  @Column({ type: 'jsonb', default: Localized.defaultString })
+  @Column({ type: 'jsonb', default: {} })
   title: Localized<string>;
 
-  @Column({ type: 'jsonb', default: Localized.defaultString })
+  @Column({ type: 'jsonb', default: {} })
   description: Localized<string>;
 
-  @Column({ type: 'jsonb', default: Localized.defaultString })
+  @Column({ type: 'jsonb', default: {} })
   compound: Localized<string[]>;
 
   @Column({ default: 0 })

@@ -1,14 +1,14 @@
 {
   "info": {
-    "name": "fruitstime-api",
     "_postman_id": "fruitstime-api-collection",
-    "description": "fruitstime-api NestJS REST API collection",
+    "name": "fruitstime-api",
+    "description": "NestJS REST API for Fruitstime. Global prefix: /api. Authentication uses JWT Bearer tokens (access + refresh). Locale query param (uz|ru|en) is required on most endpoints.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
     {
       "key": "baseUrl",
-      "value": "http://localhost:8000/api",
+      "value": "http://localhost:3000",
       "type": "string"
     },
     {
@@ -18,6 +18,31 @@
     },
     {
       "key": "refreshToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "catalogId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "productId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "bannerId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "otpId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "phoneNumber",
       "value": "",
       "type": "string"
     }
@@ -34,106 +59,117 @@
   },
   "item": [
     {
-      "name": "app",
+      "name": "Health",
       "item": [
         {
           "name": "health-check",
           "request": {
-            "auth": { "type": "noauth" },
+            "auth": {
+              "type": "noauth"
+            },
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}",
-              "host": ["{{baseUrl}}"]
-            }
+              "raw": "{{baseUrl}}/",
+              "host": ["{{baseUrl}}"],
+              "path": [""]
+            },
+            "description": "Public health check endpoint."
           },
           "response": []
         }
       ]
     },
     {
-      "name": "auth",
+      "name": "Auth",
       "item": [
         {
           "name": "sign-up",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "const json = pm.response.json();",
-                  "if (json.accessToken) pm.collectionVariables.set('accessToken', json.accessToken);",
-                  "if (json.refreshToken) pm.collectionVariables.set('refreshToken', json.refreshToken);"
-                ]
-              }
-            }
-          ],
           "request": {
-            "auth": { "type": "noauth" },
+            "auth": {
+              "type": "noauth"
+            },
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"firstName\": \"Admin\",\n  \"phoneNumber\": \"998000000000\",\n  \"password\": \"12345678\"\n}",
-              "options": { "raw": { "language": "json" } }
+              "raw": "{\n  \"firstName\": \"John\",\n  \"phoneNumber\": \"+998901234567\",\n  \"password\": \"secret123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
             "url": {
-              "raw": "{{baseUrl}}/auth/sign-up",
+              "raw": "{{baseUrl}}/api/auth/sign-up",
               "host": ["{{baseUrl}}"],
-              "path": ["auth", "sign-up"]
-            }
+              "path": ["api", "auth", "sign-up"]
+            },
+            "description": "Register a new user.\n\n**Body (CreateUserRequest)**\n- `firstName` (string, required)\n- `phoneNumber` (string, required)\n- `password` (string, required)"
           },
           "response": []
         },
         {
-          "name": "sign-in",
+          "name": "Sign In",
           "event": [
             {
               "listen": "test",
               "script": {
-                "type": "text/javascript",
                 "exec": [
-                  "const json = pm.response.json();",
+                  "var json = pm.response.json();",
                   "if (json.accessToken) pm.collectionVariables.set('accessToken', json.accessToken);",
                   "if (json.refreshToken) pm.collectionVariables.set('refreshToken', json.refreshToken);"
-                ]
+                ],
+                "type": "text/javascript"
               }
             }
           ],
           "request": {
-            "auth": { "type": "noauth" },
+            "auth": {
+              "type": "noauth"
+            },
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"phoneNumber\": \"998000000000\",\n  \"password\": \"12345678\"\n}",
-              "options": { "raw": { "language": "json" } }
+              "raw": "{\n  \"phoneNumber\": \"+998901234567\",\n  \"password\": \"secret123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
             "url": {
-              "raw": "{{baseUrl}}/auth/sign-in",
+              "raw": "{{baseUrl}}/api/auth/sign-in",
               "host": ["{{baseUrl}}"],
-              "path": ["auth", "sign-in"]
-            }
+              "path": ["api", "auth", "sign-in"]
+            },
+            "description": "Authenticate with phone number and password. Saves `accessToken` and `refreshToken` to collection variables on success.\n\n**Body (SignInRequest)**\n- `phoneNumber` (string, required)\n- `password` (string, required)"
           },
           "response": []
         },
         {
-          "name": "refresh",
+          "name": "Refresh Token",
           "event": [
             {
               "listen": "test",
               "script": {
-                "type": "text/javascript",
                 "exec": [
-                  "const json = pm.response.json();",
+                  "var json = pm.response.json();",
                   "if (json.accessToken) pm.collectionVariables.set('accessToken', json.accessToken);",
                   "if (json.refreshToken) pm.collectionVariables.set('refreshToken', json.refreshToken);"
-                ]
+                ],
+                "type": "text/javascript"
               }
             }
           ],
@@ -141,444 +177,754 @@
             "auth": {
               "type": "bearer",
               "bearer": [
-                { "key": "token", "value": "{{refreshToken}}", "type": "string" }
+                {
+                  "key": "token",
+                  "value": "{{refreshToken}}",
+                  "type": "string"
+                }
               ]
             },
             "method": "POST",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/auth/refresh",
+              "raw": "{{baseUrl}}/api/auth/refresh",
               "host": ["{{baseUrl}}"],
-              "path": ["auth", "refresh"]
-            }
-          },
-          "response": []
-        }
-      ]
-    },
-    {
-      "name": "user",
-      "item": [
-        {
-          "name": "get-me",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/user/me",
-              "host": ["{{baseUrl}}"],
-              "path": ["user", "me"]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "get-all [ADMIN]",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/user?locale=uz&page=1&pageSize=10",
-              "host": ["{{baseUrl}}"],
-              "path": ["user"],
-              "query": [
-                { "key": "locale", "value": "uz", "description": "uz | ru | en" },
-                { "key": "page", "value": "1", "description": "Page number (min: 1)" },
-                { "key": "pageSize", "value": "10", "description": "Items per page (max: 50)" }
-              ]
-            }
-          },
-          "response": []
-        }
-      ]
-    },
-    {
-      "name": "catalog",
-      "item": [
-        {
-          "name": "get-active",
-          "request": {
-            "auth": { "type": "noauth" },
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/catalog?locale=uz",
-              "host": ["{{baseUrl}}"],
-              "path": ["catalog"],
-              "query": [
-                { "key": "locale", "value": "uz", "description": "uz | ru | en" }
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "get-all [ADMIN]",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/catalog/all?locale=uz",
-              "host": ["{{baseUrl}}"],
-              "path": ["catalog", "all"],
-              "query": [
-                { "key": "locale", "value": "uz", "description": "uz | ru | en" }
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "create [ADMIN]",
-          "request": {
-            "method": "POST",
-            "header": [],
-            "body": {
-              "mode": "formdata",
-              "formdata": [
-                { "key": "title", "value": "Catalog title", "type": "text", "description": "Catalog name for the given locale (required)" },
-                { "key": "file", "type": "file", "src": "", "description": "Catalog cover image (required)" }
-              ]
+              "path": ["api", "auth", "refresh"]
             },
-            "url": {
-              "raw": "{{baseUrl}}/catalog?locale=uz",
-              "host": ["{{baseUrl}}"],
-              "path": ["catalog"],
-              "query": [
-                { "key": "locale", "value": "uz", "description": "uz | ru | en — locale in which the title is saved" }
-              ]
-            }
+            "description": "Refresh access token using a valid refresh token (JWT Refresh Guard). Send the refresh token as Bearer in the Authorization header."
           },
           "response": []
         },
         {
-          "name": "update [ADMIN]",
+          "name": "Check Phone Number",
           "request": {
-            "method": "PUT",
-            "header": [],
-            "body": {
-              "mode": "formdata",
-              "formdata": [
-                { "key": "title", "value": "Updated title", "type": "text", "description": "Catalog name for the given locale (required)" },
-                { "key": "file", "type": "file", "src": "", "description": "New catalog cover image (optional)" }
-              ]
+            "auth": {
+              "type": "noauth"
             },
-            "url": {
-              "raw": "{{baseUrl}}/catalog/:catalogId?locale=uz",
-              "host": ["{{baseUrl}}"],
-              "path": ["catalog", ":catalogId"],
-              "variable": [
-                { "key": "catalogId", "value": "", "description": "UUID of the catalog to update" }
-              ],
-              "query": [
-                { "key": "locale", "value": "uz", "description": "uz | ru | en — locale in which the title is updated" }
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "delete [ADMIN]",
-          "request": {
-            "method": "DELETE",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/catalog/:catalogId",
-              "host": ["{{baseUrl}}"],
-              "path": ["catalog", ":catalogId"],
-              "variable": [
-                { "key": "catalogId", "value": "", "description": "UUID of the catalog to delete" }
-              ]
-            }
-          },
-          "response": []
-        }
-      ]
-    },
-    {
-      "name": "product",
-      "item": [
-        {
-          "name": "get-active",
-          "request": {
-            "auth": { "type": "noauth" },
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/catalog/:catalogId/product?locale=uz",
+              "raw": "{{baseUrl}}/api/auth/check/{{phoneNumber}}",
               "host": ["{{baseUrl}}"],
-              "path": ["catalog", ":catalogId", "product"],
-              "variable": [
-                { "key": "catalogId", "value": "", "description": "UUID of the parent catalog" }
-              ],
-              "query": [
-                { "key": "locale", "value": "uz", "description": "uz | ru | en" }
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "get-all [ADMIN]",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/:catalogId/product/all?locale=uz",
-              "host": ["{{baseUrl}}"],
-              "path": [":catalogId", "product", "all"],
-              "variable": [
-                { "key": "catalogId", "value": "", "description": "UUID of the parent catalog" }
-              ],
-              "query": [
-                { "key": "locale", "value": "uz", "description": "uz | ru | en" }
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "create [ADMIN]",
-          "request": {
-            "method": "POST",
-            "header": [],
-            "body": {
-              "mode": "formdata",
-              "formdata": [
-                { "key": "title", "value": "Product title", "type": "text", "description": "Product name for the given locale (required)" },
-                { "key": "description", "value": "Product description", "type": "text", "description": "Product description for the given locale (required)" },
-                { "key": "compound[0]", "value": "ingredient 1", "type": "text", "description": "Ingredient list — send multiple compound[n] fields for an array" },
-                { "key": "compound[1]", "value": "ingredient 2", "type": "text" },
-                { "key": "price", "value": "0", "type": "text", "description": "Price in minimal currency unit, integer >= 0 (required)" },
-                { "key": "file", "type": "file", "src": "", "description": "Product image (required)" }
-              ]
+              "path": ["api", "auth", "check", "{{phoneNumber}}"]
             },
-            "url": {
-              "raw": "{{baseUrl}}/:catalogId/product?locale=uz",
-              "host": ["{{baseUrl}}"],
-              "path": [":catalogId", "product"],
-              "variable": [
-                { "key": "catalogId", "value": "", "description": "UUID of the parent catalog" }
-              ],
-              "query": [
-                { "key": "locale", "value": "uz", "description": "uz | ru | en — locale in which the fields are saved" }
-              ]
-            }
+            "description": "Check whether a phone number is already registered.\n\n**Path Params**\n- `phoneNumber` (string, required)"
           },
           "response": []
         },
         {
-          "name": "update [ADMIN]",
+          "name": "Send OTP",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var json = pm.response.json();",
+                  "if (json.otpId) pm.collectionVariables.set('otpId', json.otpId);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
           "request": {
-            "method": "PUT",
-            "header": [],
-            "body": {
-              "mode": "formdata",
-              "formdata": [
-                { "key": "title", "value": "Updated title", "type": "text", "description": "Product name for the given locale (required)" },
-                { "key": "description", "value": "Updated description", "type": "text", "description": "Product description for the given locale (required)" },
-                { "key": "compound[0]", "value": "ingredient 1", "type": "text", "description": "Ingredient list (required) — send multiple compound[n] fields for an array" },
-                { "key": "compound[1]", "value": "ingredient 2", "type": "text" },
-                { "key": "price", "value": "0", "type": "text", "description": "Price in minimal currency unit, integer >= 0 (required)" },
-                { "key": "file", "type": "file", "src": "", "description": "New product image (optional)" }
-              ]
+            "auth": {
+              "type": "noauth"
             },
-            "url": {
-              "raw": "{{baseUrl}}/:catalogId/product/:productId?locale=uz",
-              "host": ["{{baseUrl}}"],
-              "path": [":catalogId", "product", ":productId"],
-              "variable": [
-                { "key": "catalogId", "value": "", "description": "UUID of the parent catalog" },
-                { "key": "productId", "value": "", "description": "UUID of the product to update" }
-              ],
-              "query": [
-                { "key": "locale", "value": "uz", "description": "uz | ru | en — locale in which the fields are updated" }
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "delete [ADMIN]",
-          "request": {
-            "method": "DELETE",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/:catalogId/product/:productId",
-              "host": ["{{baseUrl}}"],
-              "path": [":catalogId", "product", ":productId"],
-              "variable": [
-                { "key": "catalogId", "value": "", "description": "UUID of the parent catalog" },
-                { "key": "productId", "value": "", "description": "UUID of the product to delete" }
-              ]
-            }
-          },
-          "response": []
-        }
-      ]
-    },
-    {
-      "name": "stats",
-      "item": [
-        {
-          "name": "get-summary [ADMIN]",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/stats",
-              "host": ["{{baseUrl}}"],
-              "path": ["stats"]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "get-users-trend [ADMIN]",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/stats/users-trend?startDate=2026-01-01&endDate=2026-12-31",
-              "host": ["{{baseUrl}}"],
-              "path": ["stats", "users-trend"],
-              "query": [
-                { "key": "startDate", "value": "2026-01-01", "description": "Range start date (ISO 8601, required)" },
-                { "key": "endDate", "value": "2026-12-31", "description": "Range end date (ISO 8601, required)" }
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "get-orders-trend [ADMIN]",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/stats/orders-trend?startDate=2026-01-01&endDate=2026-12-31",
-              "host": ["{{baseUrl}}"],
-              "path": ["stats", "orders-trend"],
-              "query": [
-                { "key": "startDate", "value": "2026-01-01", "description": "Range start date (ISO 8601, required)" },
-                { "key": "endDate", "value": "2026-12-31", "description": "Range end date (ISO 8601, required)" }
-              ]
-            }
-          },
-          "response": []
-        }
-      ]
-    },
-    {
-      "name": "assistant",
-      "item": [
-        {
-          "name": "ask",
-          "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"text\": \"Your question here\"\n}",
-              "options": { "raw": { "language": "json" } }
+              "raw": "{\n  \"phoneNumber\": \"+998901234567\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
             "url": {
-              "raw": "{{baseUrl}}/assistant/ask",
+              "raw": "{{baseUrl}}/api/auth/send-otp",
               "host": ["{{baseUrl}}"],
-              "path": ["assistant", "ask"]
-            }
+              "path": ["api", "auth", "send-otp"]
+            },
+            "description": "Send an OTP code to the given phone number. Returns an `otpId` saved to collection variables.\n\n**Body (SendOtpRequest)**\n- `phoneNumber` (string, required, exactly 12 chars)"
+          },
+          "response": []
+        },
+        {
+          "name": "Verify OTP",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"123456\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/verify-otp/{{otpId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "verify-otp", "{{otpId}}"]
+            },
+            "description": "Verify an OTP code for a given OTP session.\n\n**Path Params**\n- `otpId` (string, required)\n\n**Body (VerifyOtpRequest)**\n- `code` (string)"
           },
           "response": []
         }
       ]
     },
     {
-      "name": "banner",
+      "name": "User",
       "item": [
         {
-          "name": "get-active",
-          "request": {
-            "auth": { "type": "noauth" },
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/banner?locale=uz",
-              "host": ["{{baseUrl}}"],
-              "path": ["banner"],
-              "query": [
-                { "key": "locale", "value": "uz", "description": "uz | ru | en" }
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "get-all [ADMIN]",
+          "name": "Get My Profile",
           "request": {
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/banner/all?locale=uz",
+              "raw": "{{baseUrl}}/api/user/me",
               "host": ["{{baseUrl}}"],
-              "path": ["banner", "all"],
-              "query": [
-                { "key": "locale", "value": "uz", "description": "uz | ru | en" }
-              ]
-            }
+              "path": ["api", "user", "me"]
+            },
+            "description": "Get the authenticated user's own profile. Requires a valid access token."
           },
           "response": []
         },
         {
-          "name": "create [ADMIN]",
+          "name": "List Users (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/user?locale=uz&page=1&pageSize=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "user"],
+              "query": [
+                {
+                  "key": "locale",
+                  "value": "uz",
+                  "description": "Required. uz | ru | en"
+                },
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Required. Min: 1"
+                },
+                {
+                  "key": "pageSize",
+                  "value": "20",
+                  "description": "Required. Max: 50"
+                }
+              ]
+            },
+            "description": "Paginated list of all users. **Admin role required.**\n\n**Query (PaginationQuery)**\n- `locale` (uz|ru|en, required)\n- `page` (int, min 1, required)\n- `pageSize` (int, max 50, required)"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Catalog",
+      "item": [
+        {
+          "name": "Get Active Catalogs",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/catalog?locale=uz",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "catalog"],
+              "query": [
+                {
+                  "key": "locale",
+                  "value": "uz",
+                  "description": "Required. uz | ru | en"
+                }
+              ]
+            },
+            "description": "Public endpoint. Returns only active catalogs.\n\n**Query (BasicQuery)**\n- `locale` (uz|ru|en, required)"
+          },
+          "response": []
+        },
+        {
+          "name": "Get All Catalogs (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/catalog/all?locale=uz",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "catalog", "all"],
+              "query": [
+                {
+                  "key": "locale",
+                  "value": "uz",
+                  "description": "Required. uz | ru | en"
+                }
+              ]
+            },
+            "description": "Returns all catalogs including inactive ones. **Admin role required.**\n\n**Query (BasicQuery)**\n- `locale` (uz|ru|en, required)"
+          },
+          "response": []
+        },
+        {
+          "name": "Create Catalog (Admin)",
           "request": {
             "method": "POST",
             "header": [],
             "body": {
               "mode": "formdata",
               "formdata": [
-                { "key": "title", "value": "Banner title", "type": "text", "description": "Banner title for the given locale (required)" },
-                { "key": "content", "value": "Banner content", "type": "text", "description": "Banner body text for the given locale (required)" },
-                { "key": "file", "type": "file", "src": "", "description": "Banner image (required)" }
+                {
+                  "key": "title",
+                  "value": "Fruits",
+                  "description": "Required. Catalog title.",
+                  "type": "text"
+                },
+                {
+                  "key": "file",
+                  "description": "Optional. Catalog image file.",
+                  "type": "file",
+                  "src": []
+                }
               ]
             },
             "url": {
-              "raw": "{{baseUrl}}/banner?locale=uz",
+              "raw": "{{baseUrl}}/api/catalog?locale=uz",
               "host": ["{{baseUrl}}"],
-              "path": ["banner"],
+              "path": ["api", "catalog"],
               "query": [
-                { "key": "locale", "value": "uz", "description": "uz | ru | en — locale in which the fields are saved" }
+                {
+                  "key": "locale",
+                  "value": "uz",
+                  "description": "Required. uz | ru | en"
+                }
               ]
-            }
+            },
+            "description": "Create a new catalog with an optional image upload. **Admin role required.**\n\n**Query (BasicQuery)**\n- `locale` (uz|ru|en, required)\n\n**Body (multipart/form-data — CreateCatalogRequest)**\n- `title` (string, required)\n- `file` (file, optional)"
           },
           "response": []
         },
         {
-          "name": "update [ADMIN]",
+          "name": "Update Catalog (Admin)",
           "request": {
             "method": "PUT",
             "header": [],
             "body": {
               "mode": "formdata",
               "formdata": [
-                { "key": "title", "value": "Updated title", "type": "text", "description": "Banner title for the given locale (optional)" },
-                { "key": "content", "value": "Updated content", "type": "text", "description": "Banner body text for the given locale (optional)" },
-                { "key": "isActive", "value": "true", "type": "text", "description": "Toggle banner visibility: true | false (optional)" },
-                { "key": "file", "type": "file", "src": "", "description": "New banner image (optional)" }
+                {
+                  "key": "title",
+                  "value": "Updated Fruits",
+                  "description": "Optional. Catalog title.",
+                  "type": "text"
+                },
+                {
+                  "key": "isActive",
+                  "value": "true",
+                  "description": "Optional. true | false",
+                  "type": "text"
+                },
+                {
+                  "key": "file",
+                  "description": "Optional. Catalog image file.",
+                  "type": "file",
+                  "src": []
+                }
               ]
             },
             "url": {
-              "raw": "{{baseUrl}}/banner/:bannerId?locale=uz",
+              "raw": "{{baseUrl}}/api/catalog/{{catalogId}}?locale=uz",
               "host": ["{{baseUrl}}"],
-              "path": ["banner", ":bannerId"],
-              "variable": [
-                { "key": "bannerId", "value": "", "description": "UUID of the banner to update" }
-              ],
+              "path": ["api", "catalog", "{{catalogId}}"],
               "query": [
-                { "key": "locale", "value": "uz", "description": "uz | ru | en — locale in which the fields are updated" }
+                {
+                  "key": "locale",
+                  "value": "uz",
+                  "description": "Required. uz | ru | en"
+                }
               ]
-            }
+            },
+            "description": "Update an existing catalog. **Admin role required.**\n\n**Path Params**\n- `catalogId` (string, required)\n\n**Query (BasicQuery)**\n- `locale` (uz|ru|en, required)\n\n**Body (multipart/form-data — UpdateCatalogRequest, all fields optional)**\n- `title` (string)\n- `isActive` (boolean string: 'true'|'false')\n- `file` (file)"
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Catalog (Admin)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/catalog/{{catalogId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "catalog", "{{catalogId}}"]
+            },
+            "description": "Delete a catalog by ID. **Admin role required.**\n\n**Path Params**\n- `catalogId` (string, required)"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Product",
+      "item": [
+        {
+          "name": "Get Active Products",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/catalog/{{catalogId}}/product?locale=uz",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "catalog", "{{catalogId}}", "product"],
+              "query": [
+                {
+                  "key": "locale",
+                  "value": "uz",
+                  "description": "Required. uz | ru | en"
+                }
+              ]
+            },
+            "description": "Public endpoint. Returns active products in the specified catalog.\n\n**Path Params**\n- `catalogId` (string, required)\n\n**Query (BasicQuery)**\n- `locale` (uz|ru|en, required)"
+          },
+          "response": []
+        },
+        {
+          "name": "Get All Products (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/catalog/{{catalogId}}/product/all?locale=uz",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "catalog", "{{catalogId}}", "product", "all"],
+              "query": [
+                {
+                  "key": "locale",
+                  "value": "uz",
+                  "description": "Required. uz | ru | en"
+                }
+              ]
+            },
+            "description": "Returns all products (including inactive) in the specified catalog. **Admin role required.**\n\n**Path Params**\n- `catalogId` (string, required)\n\n**Query (BasicQuery)**\n- `locale` (uz|ru|en, required)"
+          },
+          "response": []
+        },
+        {
+          "name": "Create Product (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "title",
+                  "value": "Apple",
+                  "description": "Required. Product title.",
+                  "type": "text"
+                },
+                {
+                  "key": "description",
+                  "value": "Fresh red apple",
+                  "description": "Required. Product description.",
+                  "type": "text"
+                },
+                {
+                  "key": "compound",
+                  "value": "vitamin C",
+                  "description": "Required. Compound item (repeat key for multiple values).",
+                  "type": "text"
+                },
+                {
+                  "key": "compound",
+                  "value": "fiber",
+                  "description": "Required. Another compound item.",
+                  "type": "text"
+                },
+                {
+                  "key": "price",
+                  "value": "5000",
+                  "description": "Required. Price in smallest unit (integer, min 0).",
+                  "type": "text"
+                },
+                {
+                  "key": "file",
+                  "description": "Optional. Product image file.",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/catalog/{{catalogId}}/product?locale=uz",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "catalog", "{{catalogId}}", "product"],
+              "query": [
+                {
+                  "key": "locale",
+                  "value": "uz",
+                  "description": "Required. uz | ru | en"
+                }
+              ]
+            },
+            "description": "Create a new product in a catalog with optional image. **Admin role required.**\n\n**Path Params**\n- `catalogId` (string, required)\n\n**Query (BasicQuery)**\n- `locale` (uz|ru|en, required)\n\n**Body (multipart/form-data — CreateProductRequest)**\n- `title` (string, required)\n- `description` (string, required)\n- `compound` (string[], required — repeat key for array)\n- `price` (int, min 0, required)\n- `file` (file, optional)"
+          },
+          "response": []
+        },
+        {
+          "name": "Update Product (Admin)",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "title",
+                  "value": "Green Apple",
+                  "description": "Optional. Product title.",
+                  "type": "text"
+                },
+                {
+                  "key": "description",
+                  "value": "Fresh green apple",
+                  "description": "Optional. Product description.",
+                  "type": "text"
+                },
+                {
+                  "key": "compound",
+                  "value": "vitamin C",
+                  "description": "Optional. Compound item.",
+                  "type": "text"
+                },
+                {
+                  "key": "price",
+                  "value": "4500",
+                  "description": "Optional. Price (int, min 0).",
+                  "type": "text"
+                },
+                {
+                  "key": "isActive",
+                  "value": "true",
+                  "description": "Optional. true | false",
+                  "type": "text"
+                },
+                {
+                  "key": "file",
+                  "description": "Optional. Product image file.",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/catalog/{{catalogId}}/product/{{productId}}?locale=uz",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "catalog", "{{catalogId}}", "product", "{{productId}}"],
+              "query": [
+                {
+                  "key": "locale",
+                  "value": "uz",
+                  "description": "Required. uz | ru | en"
+                }
+              ]
+            },
+            "description": "Update an existing product. **Admin role required.**\n\n**Path Params**\n- `catalogId` (string, required)\n- `productId` (string, required)\n\n**Query (BasicQuery)**\n- `locale` (uz|ru|en, required)\n\n**Body (multipart/form-data — UpdateProductRequest, all fields optional)**\n- `title` (string)\n- `description` (string)\n- `compound` (string[] — repeat key for array)\n- `price` (int, min 0)\n- `isActive` (boolean string: 'true'|'false')\n- `file` (file)"
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Product (Admin)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/catalog/{{catalogId}}/product/{{productId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "catalog", "{{catalogId}}", "product", "{{productId}}"]
+            },
+            "description": "Delete a product by ID. **Admin role required.**\n\n**Path Params**\n- `catalogId` (string, required)\n- `productId` (string, required)"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Banner",
+      "item": [
+        {
+          "name": "Get Active Banners",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/banner?locale=uz",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "banner"],
+              "query": [
+                {
+                  "key": "locale",
+                  "value": "uz",
+                  "description": "Required. uz | ru | en"
+                }
+              ]
+            },
+            "description": "Public endpoint. Returns only active banners.\n\n**Query (BasicQuery)**\n- `locale` (uz|ru|en, required)"
+          },
+          "response": []
+        },
+        {
+          "name": "Get All Banners (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/banner/all?locale=uz",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "banner", "all"],
+              "query": [
+                {
+                  "key": "locale",
+                  "value": "uz",
+                  "description": "Required. uz | ru | en"
+                }
+              ]
+            },
+            "description": "Returns all banners including inactive. **Admin role required.**\n\n**Query (BasicQuery)**\n- `locale` (uz|ru|en, required)"
+          },
+          "response": []
+        },
+        {
+          "name": "Create Banner (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "title",
+                  "value": "Summer Sale",
+                  "description": "Required. Banner title.",
+                  "type": "text"
+                },
+                {
+                  "key": "content",
+                  "value": "Up to 50% off on all fruits!",
+                  "description": "Required. Banner content/body text.",
+                  "type": "text"
+                },
+                {
+                  "key": "file",
+                  "description": "Optional. Banner image file.",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/banner?locale=uz",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "banner"],
+              "query": [
+                {
+                  "key": "locale",
+                  "value": "uz",
+                  "description": "Required. uz | ru | en"
+                }
+              ]
+            },
+            "description": "Create a new banner with optional image. **Admin role required.**\n\n**Query (BasicQuery)**\n- `locale` (uz|ru|en, required)\n\n**Body (multipart/form-data — CreateBannerRequest)**\n- `title` (string, required)\n- `content` (string, required)\n- `file` (file, optional)"
+          },
+          "response": []
+        },
+        {
+          "name": "Update Banner (Admin)",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "title",
+                  "value": "Winter Sale",
+                  "description": "Optional. Banner title.",
+                  "type": "text"
+                },
+                {
+                  "key": "content",
+                  "value": "Hot deals this winter!",
+                  "description": "Optional. Banner content.",
+                  "type": "text"
+                },
+                {
+                  "key": "isActive",
+                  "value": "true",
+                  "description": "Optional. true | false",
+                  "type": "text"
+                },
+                {
+                  "key": "file",
+                  "description": "Optional. Banner image file.",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/banner/{{bannerId}}?locale=uz",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "banner", "{{bannerId}}"],
+              "query": [
+                {
+                  "key": "locale",
+                  "value": "uz",
+                  "description": "Required. uz | ru | en"
+                }
+              ]
+            },
+            "description": "Update an existing banner. **Admin role required.**\n\n**Path Params**\n- `bannerId` (string, required)\n\n**Query (BasicQuery)**\n- `locale` (uz|ru|en, required)\n\n**Body (multipart/form-data — UpdateBannerRequest, all fields optional)**\n- `title` (string)\n- `content` (string)\n- `isActive` (boolean string: 'true'|'false')\n- `file` (file)"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Stats",
+      "item": [
+        {
+          "name": "Get Summary Stats (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/stats",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "stats"]
+            },
+            "description": "Returns overall summary statistics. **Admin role required.**"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Users Trend (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/stats/users-trend?startDate=2024-01-01&endDate=2024-12-31",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "stats", "users-trend"],
+              "query": [
+                {
+                  "key": "startDate",
+                  "value": "2024-01-01",
+                  "description": "Required. ISO date string."
+                },
+                {
+                  "key": "endDate",
+                  "value": "2024-12-31",
+                  "description": "Required. ISO date string."
+                }
+              ]
+            },
+            "description": "Returns user registration trend over a date range. **Admin role required.**\n\n**Query (DateRangeQuery)**\n- `startDate` (Date, required — ISO string)\n- `endDate` (Date, required — ISO string)"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Orders Trend (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/stats/orders-trend?startDate=2024-01-01&endDate=2024-12-31",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "stats", "orders-trend"],
+              "query": [
+                {
+                  "key": "startDate",
+                  "value": "2024-01-01",
+                  "description": "Required. ISO date string."
+                },
+                {
+                  "key": "endDate",
+                  "value": "2024-12-31",
+                  "description": "Required. ISO date string."
+                }
+              ]
+            },
+            "description": "Returns orders trend over a date range. **Admin role required.**\n\n**Query (DateRangeQuery)**\n- `startDate` (Date, required — ISO string)\n- `endDate` (Date, required — ISO string)"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Assistant",
+      "item": [
+        {
+          "name": "Ask Assistant",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"What fruits do you have?\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/assistant/ask?locale=uz",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "assistant", "ask"],
+              "query": [
+                {
+                  "key": "locale",
+                  "value": "uz",
+                  "description": "Required. uz | ru | en"
+                }
+              ]
+            },
+            "description": "Public endpoint. Ask the AI assistant a question.\n\n**Query (BasicQuery)**\n- `locale` (uz|ru|en, required)\n\n**Body (AskRequest)**\n- `text` (string, required)"
           },
           "response": []
         }

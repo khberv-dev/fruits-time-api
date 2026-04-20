@@ -20,9 +20,9 @@ export class BannerService {
     const banners = await qb.getMany();
     return banners.map((banner) => ({
       ...banner,
-      title: banner.title[locale],
-      content: banner.content[locale],
-      image: banner.image[locale],
+      title: banner.title[locale] ?? '',
+      content: banner.content[locale] ?? '',
+      image: banner.image[locale] ?? '',
     }));
   }
 

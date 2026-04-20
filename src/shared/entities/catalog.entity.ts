@@ -1,5 +1,5 @@
 import { Column, CreateDateColumn, Entity, OneToMany, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
-import  { Localized } from '@/shared/types/localized.type';
+import { Localized } from '@/shared/types/localized.type';
 import { Product } from '@/shared/entities/product.entity';
 
 @Entity('catalogs')
@@ -10,7 +10,7 @@ export class Catalog {
   @Column()
   image: string;
 
-  @Column({ type: 'jsonb', default: Localized.defaultString })
+  @Column({ type: 'jsonb', default: {} })
   title: Localized<string>;
 
   @OneToMany(() => Product, (product) => product.catalog)
