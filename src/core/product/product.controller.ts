@@ -7,6 +7,7 @@ import { CreateProductRequest } from '@/core/product/dto/create-product-request.
 import { uploadFileInterceptor } from '@/common/interceptors/upload-file.interceptor';
 import { UpdateProductRequest } from '@/core/product/dto/update-product-request.dto';
 import { IsPublic } from '@/common/decorators/is_public.decorator';
+import { SearchQuery } from '@/shared/dto/search-query.dto';
 
 @Controller('catalog/:catalogId/product')
 export class ProductController {
@@ -16,6 +17,12 @@ export class ProductController {
   @IsPublic()
   get(@Param('catalogId') catalogId: string, @Query() query: BasicQuery) {
     return this.productService.findAll(catalogId, query.locale);
+  }
+
+  @Get('search')
+  @IsPublic()
+  search(@Query() query: SearchQuery) {
+    return this.productService.search(query.locale, query.search);
   }
 
   @Get('all')

@@ -29,6 +29,39 @@ export class ProductService {
     }));
   }
 
+  async search(locale: Locale, search: string) {
+    if (search.trim().length == 0) {
+      return [];
+    }
+
+    const qb = this.productRepo.createQueryBuilder('p');
+
+    qb.where(`p.title->>:lang ILIKE :search`, {
+      lang: locale,
+      search: `%${search}%`,
+    });
+
+    qb.orWhere(
+      `EXISTS (
+            SELECT 1 FROM jsonb_array_elements_text(p.compound->:lang) AS elem
+            WHERE elem ILIKE :search
+          )`,
+      {
+        lang: locale,
+        search: `%${search}%`,
+      },
+    );
+
+    const products = await qb.getMany();
+
+    return products.map((product) => ({
+      ...product,
+      title: product.getTitle(locale),
+      description: product.getDescription(locale),
+      compound: product.getCompound(locale),
+    }));
+  }
+
   create(catalogId: string, locale: Locale, fileName: string, data: CreateProductRequest) {
     return this.productRepo.save({
       title: { [locale]: data.title },
