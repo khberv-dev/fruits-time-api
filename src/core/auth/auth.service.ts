@@ -12,6 +12,7 @@ import { SendOtpRequest } from '@/core/auth/dto/send-otp-request.dto';
 import { Otp } from '@/shared/entities/otp.entity';
 import { VerifyOtpRequest } from '@/core/auth/dto/verify-otp-request.dto';
 import dayjs from 'dayjs';
+import { SmsService } from '@/core/notify/sms.service';
 
 @Injectable()
 export class AuthService {
@@ -20,6 +21,7 @@ export class AuthService {
     @InjectRepository(Otp) private readonly otpRepo: Repository<Otp>,
     private readonly jwtService: JwtService,
     private readonly config: ConfigService,
+    private readonly smsService: SmsService,
   ) {}
 
   private issueTokens(userId: string, role: UserRole) {
@@ -108,6 +110,7 @@ export class AuthService {
   async sendOtp(data: SendOtpRequest) {
     const code = randomOTP();
 
+    await this.smsService.sendOTP(code, data.phoneNumber);
     return this.otpRepo.save({
       phoneNumber: data.phoneNumber,
       code: code,
