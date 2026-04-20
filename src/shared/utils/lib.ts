@@ -13,3 +13,7 @@ export function randomOTP() {
     .toString()
     .padStart(5, '0');
 }
+
+export function getObjectDefaultValue(obj: object, def: any) {
+  return obj[Object.keys(obj)[0]] ?? def;
+}

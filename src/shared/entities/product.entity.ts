@@ -9,6 +9,8 @@ import {
 } from 'typeorm';
 import { Localized } from '@/shared/types/localized.type';
 import { Catalog } from '@/shared/entities/catalog.entity';
+import { Locale } from '@/shared/enums/locale.enum';
+import { getObjectDefaultValue } from '@/shared/utils/lib';
 
 @Entity('products')
 export class Product {
@@ -42,4 +44,16 @@ export class Product {
 
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
+
+  getTitle(locale: Locale): string {
+    return this.title[locale] ?? getObjectDefaultValue(this.title, '');
+  }
+
+  getDescription(locale: Locale): string {
+    return this.description[locale] ?? getObjectDefaultValue(this.description, '');
+  }
+
+  getCompound(locale: Locale): string[] {
+    return this.compound[locale] ?? getObjectDefaultValue(this.compound, []);
+  }
 }
