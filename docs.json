@@ -115,7 +115,7 @@
           "response": []
         },
         {
-          "name": "Sign In",
+          "name": "sign-in",
           "event": [
             {
               "listen": "test",
@@ -159,7 +159,7 @@
           "response": []
         },
         {
-          "name": "Refresh Token",
+          "name": "refresh-token",
           "event": [
             {
               "listen": "test",
@@ -196,7 +196,7 @@
           "response": []
         },
         {
-          "name": "Check Phone Number",
+          "name": "check-phone-number",
           "request": {
             "auth": {
               "type": "noauth"
@@ -213,7 +213,7 @@
           "response": []
         },
         {
-          "name": "Send OTP",
+          "name": "send-otp",
           "event": [
             {
               "listen": "test",
@@ -256,7 +256,7 @@
           "response": []
         },
         {
-          "name": "Verify OTP",
+          "name": "verify-otp",
           "request": {
             "auth": {
               "type": "noauth"
@@ -292,7 +292,7 @@
       "name": "User",
       "item": [
         {
-          "name": "Get My Profile",
+          "name": "get-my-profile",
           "request": {
             "method": "GET",
             "header": [],
@@ -306,7 +306,7 @@
           "response": []
         },
         {
-          "name": "List Users (Admin)",
+          "name": "list-users [admin]",
           "request": {
             "method": "GET",
             "header": [],
@@ -342,7 +342,7 @@
       "name": "Catalog",
       "item": [
         {
-          "name": "Get Active Catalogs",
+          "name": "get-active-catalogs",
           "request": {
             "auth": {
               "type": "noauth"
@@ -366,7 +366,7 @@
           "response": []
         },
         {
-          "name": "Get All Catalogs (Admin)",
+          "name": "get-all-catalogs [admin]",
           "request": {
             "method": "GET",
             "header": [],
@@ -387,7 +387,7 @@
           "response": []
         },
         {
-          "name": "Create Catalog (Admin)",
+          "name": "create-catalog [admin]",
           "request": {
             "method": "POST",
             "header": [],
@@ -425,7 +425,7 @@
           "response": []
         },
         {
-          "name": "Update Catalog (Admin)",
+          "name": "update-catalog [admin]",
           "request": {
             "method": "PUT",
             "header": [],
@@ -469,7 +469,7 @@
           "response": []
         },
         {
-          "name": "Delete Catalog (Admin)",
+          "name": "delete-catalog [admin]",
           "request": {
             "method": "DELETE",
             "header": [],
@@ -488,7 +488,7 @@
       "name": "Product",
       "item": [
         {
-          "name": "Get Active Products",
+          "name": "get-active-products",
           "request": {
             "auth": {
               "type": "noauth"
@@ -512,7 +512,7 @@
           "response": []
         },
         {
-          "name": "Get All Products (Admin)",
+          "name": "get-all-products [admin]",
           "request": {
             "method": "GET",
             "header": [],
@@ -533,7 +533,7 @@
           "response": []
         },
         {
-          "name": "Create Product (Admin)",
+          "name": "create-product [admin]",
           "request": {
             "method": "POST",
             "header": [],
@@ -595,7 +595,7 @@
           "response": []
         },
         {
-          "name": "Update Product (Admin)",
+          "name": "update-product [admin]",
           "request": {
             "method": "PUT",
             "header": [],
@@ -657,7 +657,7 @@
           "response": []
         },
         {
-          "name": "Delete Product (Admin)",
+          "name": "delete-product [admin]",
           "request": {
             "method": "DELETE",
             "header": [],
@@ -676,7 +676,7 @@
       "name": "Banner",
       "item": [
         {
-          "name": "Get Active Banners",
+          "name": "get-active-banners",
           "request": {
             "auth": {
               "type": "noauth"
@@ -700,7 +700,7 @@
           "response": []
         },
         {
-          "name": "Get All Banners (Admin)",
+          "name": "get-all-banners [admin]",
           "request": {
             "method": "GET",
             "header": [],
@@ -721,7 +721,7 @@
           "response": []
         },
         {
-          "name": "Create Banner (Admin)",
+          "name": "create-banner [admin]",
           "request": {
             "method": "POST",
             "header": [],
@@ -765,7 +765,7 @@
           "response": []
         },
         {
-          "name": "Update Banner (Admin)",
+          "name": "update-banner [admin]",
           "request": {
             "method": "PUT",
             "header": [],
@@ -820,7 +820,7 @@
       "name": "Stats",
       "item": [
         {
-          "name": "Get Summary Stats (Admin)",
+          "name": "get-summary-stats [admin]",
           "request": {
             "method": "GET",
             "header": [],
@@ -834,7 +834,7 @@
           "response": []
         },
         {
-          "name": "Get Users Trend (Admin)",
+          "name": "get-users-trend [admin]",
           "request": {
             "method": "GET",
             "header": [],
@@ -860,7 +860,7 @@
           "response": []
         },
         {
-          "name": "Get Orders Trend (Admin)",
+          "name": "get-orders-trend [admin]",
           "request": {
             "method": "GET",
             "header": [],
@@ -891,7 +891,7 @@
       "name": "Assistant",
       "item": [
         {
-          "name": "Ask Assistant",
+          "name": "ask-assistant",
           "request": {
             "auth": {
               "type": "noauth"

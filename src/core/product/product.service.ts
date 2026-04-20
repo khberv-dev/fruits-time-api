@@ -25,7 +25,7 @@ export class ProductService {
       ...product,
       title: product.title[locale] ?? '',
       description: product.description[locale] ?? '',
-      compound: product.compound[locale],
+      compound: product.compound[locale] ?? [],
     }));
   }
 
