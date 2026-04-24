@@ -1,8 +1,13 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { User } from '@/shared/entities/user.entity';
 import { Repository } from 'typeorm';
 import { UserRole } from '@/shared/enums/user-role.enum';
+import { UpdateUserRequest } from '@/core/user/dto/update-user-request.dto';
+import dayjs from 'dayjs';
+import customParseFormat from 'dayjs/plugin/customParseFormat';
+
+dayjs.extend(customParseFormat);
 
 @Injectable()
 export class UserService {
@@ -49,5 +54,35 @@ export class UserService {
       total: usersCount,
       pages: Math.ceil(usersCount / pageSize),
     };
+  }
+
+  async update(userId: string, data: UpdateUserRequest) {
+    const user = await this.userRepo.findOne({
+      where: {
+        id: userId,
+      },
+    });
+
+    if (!user) {
+      throw new BadRequestException();
+    }
+
+    if (data.birthday) {
+      user.birthday = dayjs(data.birthday, 'DD-MM-YYYY').toDate();
+    }
+
+    if (data.weight) {
+      user.weight = data.weight;
+    }
+
+    if (data.height) {
+      user.height = data.height;
+    }
+
+    if (data.gender) {
+      user.gender = data.gender;
+    }
+
+    return this.userRepo.save(user);
   }
 }

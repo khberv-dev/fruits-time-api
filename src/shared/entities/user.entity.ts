@@ -1,6 +1,7 @@
-import { Column, CreateDateColumn, Entity, ManyToOne, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
+import { Column, CreateDateColumn, Entity, OneToMany, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
 import { UserRole } from '@/shared/enums/user-role.enum';
 import { Order } from '@/shared/entities/order.entity';
+import { Gender } from '@/shared/enums/gender.enum';
 
 @Entity('users')
 export class User {
@@ -16,7 +17,19 @@ export class User {
   @Column()
   password: string;
 
-  @ManyToOne(() => Order, (order) => order.user)
+  @Column({ type: 'date', nullable: true })
+  birthday: Date;
+
+  @Column({ nullable: true })
+  weight: number;
+
+  @Column({ nullable: true })
+  height: number;
+
+  @Column({ type: 'enum', enum: Gender, nullable: true })
+  gender: Gender;
+
+  @OneToMany(() => Order, (order) => order.user)
   orders: Order[];
 
   @Column({ type: 'enum', enum: UserRole })

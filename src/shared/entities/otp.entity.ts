@@ -11,7 +11,7 @@ export class Otp {
   @Column()
   code: string;
 
-  @Column({ default: 3 })
+  @Column({ default: 0 })
   attempts: number;
 
   @Column({ name: 'verified_at', nullable: true })
