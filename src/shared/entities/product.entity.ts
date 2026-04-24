@@ -11,6 +11,7 @@ import { Localized } from '@/shared/types/localized.type';
 import { Catalog } from '@/shared/entities/catalog.entity';
 import { Locale } from '@/shared/enums/locale.enum';
 import { getObjectDefaultValue } from '@/shared/utils/lib';
+import { ProductType } from '@/shared/enums/product-type.enum';
 
 @Entity('products')
 export class Product {
@@ -31,6 +32,9 @@ export class Product {
 
   @Column({ default: 0 })
   price: number;
+
+  @Column({ type: 'enum', enum: ProductType, default: ProductType.JUICE })
+  type: ProductType;
 
   @ManyToOne(() => Catalog, (catalog) => catalog.products)
   @JoinColumn({ name: 'catalog_id' })

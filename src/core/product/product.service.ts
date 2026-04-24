@@ -69,6 +69,7 @@ export class ProductService {
       compound: { [locale]: data.compound },
       price: data.price,
       image: fileName,
+      type: data.type,
       catalog: {
         id: catalogId,
       },
@@ -108,6 +109,10 @@ export class ProductService {
 
     if (data.isActive != undefined) {
       product.isActive = data.isActive;
+    }
+
+    if (data.type) {
+      product.type = data.type;
     }
 
     return this.productRepo.save(product);

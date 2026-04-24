@@ -1,5 +1,6 @@
-import { IsArray, IsInt, IsNotEmpty, IsOptional, IsString, Min } from 'class-validator';
+import { IsArray, IsEnum, IsInt, IsNotEmpty, IsOptional, IsString, Min } from 'class-validator';
 import { Type } from 'class-transformer';
+import { ProductType } from '@/shared/enums/product-type.enum';
 
 export class CreateProductRequest {
   @IsString()
@@ -19,6 +20,10 @@ export class CreateProductRequest {
   @Min(0)
   @Type(() => Number)
   price: number;
+
+  @IsOptional()
+  @IsEnum(ProductType)
+  type: ProductType;
 
   @IsOptional()
   file: any;
