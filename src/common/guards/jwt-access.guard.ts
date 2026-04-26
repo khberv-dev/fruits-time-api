@@ -16,8 +16,18 @@ export class JwtAccessGuard extends AuthGuard('jwt-access') {
       context.getClass(),
     ]);
 
-    if (isPublic) return true;
+    if (isPublic) {
+      return this.tryAuthenticate(context);
+    }
 
     return super.canActivate(context);
+  }
+
+  private async tryAuthenticate(context: ExecutionContext): Promise<boolean> {
+    try {
+      await super.canActivate(context);
+    } catch {}
+
+    return true;
   }
 }

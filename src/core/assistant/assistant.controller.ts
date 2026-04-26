@@ -18,6 +18,7 @@ export class AssistantController {
   };
 
   @Post('ask')
+  @IsPublic()
   ask(@Query() query: BasicQuery, @RequestUser() user: ReqUser, @Body() body: AskRequest) {
     if (!user) {
       return {
