@@ -6,6 +6,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Product } from '@/shared/entities/product.entity';
 import { Repository } from 'typeorm';
 import { Locale } from '@/shared/enums/locale.enum';
+import { UserService } from '@/core/user/user.service';
 
 @Injectable()
 export class AssistantService implements OnModuleInit {
@@ -14,6 +15,7 @@ export class AssistantService implements OnModuleInit {
   constructor(
     private readonly config: ConfigService,
     private readonly instructionService: InstructionsService,
+    private readonly userService: UserService,
     @InjectRepository(Product) private readonly productRepo: Repository<Product>,
   ) {}
 
@@ -21,7 +23,9 @@ export class AssistantService implements OnModuleInit {
     this.ai = new GoogleGenAI({ apiKey: this.config.getOrThrow('GENAI_KEY') });
   }
 
-  async ask(locale: Locale, text: string) {
+  async ask(locale: Locale, userId: string, text: string) {
+    const user = await this.userService.findById(userId);
+
     const products = await this.productRepo.find({
       where: {
         isActive: true,
@@ -31,7 +35,7 @@ export class AssistantService implements OnModuleInit {
     const chat = this.ai.chats.create({
       model: this.config.getOrThrow('GENAI_MODEL'),
       config: {
-        systemInstruction: this.instructionService.buildNutritionistInstructions(products),
+        systemInstruction: this.instructionService.buildNutritionistInstructions(products, user),
       },
     });
 

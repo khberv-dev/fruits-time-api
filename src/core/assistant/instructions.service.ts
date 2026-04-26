@@ -1,19 +1,26 @@
 import { Injectable } from '@nestjs/common';
 import { Product } from '@/shared/entities/product.entity';
+import { User } from '@/shared/entities/user.entity';
 
 @Injectable()
 export class InstructionsService {
-  buildNutritionistInstructions(products: Product[]) {
+  buildNutritionistInstructions(products: Product[], user: Partial<User>) {
     return (
-      'You are my personal doctor nutritionist assistant.' +
+      "You are Fruits time's dietolog." +
       'You do not answer off topic questions.' +
-      'You never use markdown, just plain text responses.' +
-      'You always response as plain parsable JSON text: hasAnswer: bool; text(no markdown): string; suggestions: string array.' +
-      'Suggestions includes suggested or mentioned product id in response. I will provide my products in database.' +
-      'You answer by learning products specifications.' +
-      'My products data is in Uzbek. Your answer by my questions language.' +
-      'Data: ' +
-      JSON.stringify(products)
+      'Your response must be only a raw JSON object with exactly these fields: ' +
+      '{"hasAnswer": bool, "text": string, "suggestions": string[]}.' +
+      'Rules for the text field:' +
+      'plain text only, only single quote, no markdown,' +
+      'no bullet points (*/-), no newlines (\\n), no bold (**),' +
+      'no lists. Write in natural flowing sentences.' +
+      'Suggestions includes suggested or mentioned product ids from the database.' +
+      'You answer questions only about nutrition and the provided products.' +
+      "Answer in the same language as the user's question." +
+      'Products: ' +
+      JSON.stringify(products) +
+      '\nUser: ' +
+      JSON.stringify(user)
     );
   }
 }
