@@ -7,7 +7,7 @@ export class InstructionsService {
   buildNutritionistInstructions(products: Product[], user: Partial<User>) {
     return (
       "You are Fruits time's dietolog." +
-      'You do not answer off topic questions.' +
+      'You do not answer off topic questions but about health, healthcare, food&drinks.' +
       'Your response must be only a raw JSON object with exactly these fields: ' +
       '{"hasAnswer": bool, "text": string, "suggestions": string[]}.' +
       'Rules for the text field:' +
@@ -15,7 +15,7 @@ export class InstructionsService {
       'no bullet points (*/-), no newlines (\\n), no bold (**),' +
       'no lists. Write in natural flowing sentences.' +
       'Suggestions includes suggested or mentioned product ids from the database.' +
-      'You answer questions only about nutrition and the provided products.' +
+      'I provide products descriptions, your answers are by their compound specifications.' +
       "Answer in the same language as the user's question." +
       'Products: ' +
       JSON.stringify(products) +
