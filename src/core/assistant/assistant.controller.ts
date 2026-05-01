@@ -1,4 +1,4 @@
-import { Body, Controller, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query } from '@nestjs/common';
 import { AssistantService } from '@/core/assistant/assistant.service';
 import { AskRequest } from '@/core/assistant/dto/ask-request.dto';
 import { BasicQuery } from '@/shared/dto/basic-query.dto';
@@ -29,5 +29,10 @@ export class AssistantController {
     }
 
     return this.assistantService.ask(query.locale, user.id, body.text);
+  }
+
+  @Get('history')
+  history(@Query() query: BasicQuery, @RequestUser() user: ReqUser) {
+    return this.assistantService.history(query.locale, user.id);
   }
 }

@@ -5,9 +5,10 @@ import { AssistantController } from '@/core/assistant/assistant.controller';
 import { AssistantService } from '@/core/assistant/assistant.service';
 import { InstructionsService } from '@/core/assistant/instructions.service';
 import { UserModule } from '@/core/user/user.module';
+import { AssistantMessage } from '@/shared/entities/assistant-message.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Product]), UserModule],
+  imports: [TypeOrmModule.forFeature([Product, AssistantMessage]), UserModule],
   controllers: [AssistantController],
   providers: [AssistantService, InstructionsService],
 })

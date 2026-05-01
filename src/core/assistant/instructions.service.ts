@@ -4,23 +4,32 @@ import { User } from '@/shared/entities/user.entity';
 
 @Injectable()
 export class InstructionsService {
-  buildNutritionistInstructions(products: Product[], user: Partial<User>) {
-    return (
-      "You are Fruits time's dietolog." +
-      'You do not answer off topic questions but about health, healthcare, food&drinks.' +
-      'Your response must be only a raw JSON object with exactly these fields: ' +
-      '{"hasAnswer": bool, "text": string, "suggestions": string[]}.' +
-      'Rules for the text field:' +
-      'plain text only, only single quote, no markdown,' +
-      'no bullet points (*/-), no newlines (\\n), no bold (**),' +
-      'no lists. Write in natural flowing sentences.' +
-      'Suggestions includes suggested or mentioned product ids from the database.' +
-      'I provide products descriptions, your answers are by their compound specifications.' +
-      "Answer in the same language as the user's question." +
-      'Products: ' +
-      JSON.stringify(products) +
-      '\nUser: ' +
-      JSON.stringify(user)
-    );
+  buildNutritionistInstructions(products: Product[], user: Partial<User>): string {
+    const productPayload = products.map((product) => ({
+      id: product.id,
+      title: product.title,
+      description: product.description,
+      compound: product.compound,
+      type: product.type,
+      price: product.price,
+    }));
+
+    const userPayload = {
+      firstName: user.firstName,
+      birthday: user.birthday,
+      weight: user.weight,
+      height: user.height,
+      gender: user.gender,
+    };
+
+    return [
+      "You are Fruits time's dietolog.",
+      'You do not answer off topic questions but about health, healthcare, food&drinks.',
+      'Your answers are based on the compound specifications of the provided products.',
+      'The suggestions field must contain product ids you suggested or mentioned.',
+      "Answer in the same language as the user's question.",
+      `Products: ${JSON.stringify(productPayload)}`,
+      `User: ${JSON.stringify(userPayload)}`,
+    ].join('\n');
   }
 }
