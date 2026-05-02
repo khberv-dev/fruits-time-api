@@ -1,4 +1,14 @@
 import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
+import {
+  ApiBadRequestResponse,
+  ApiBearerAuth,
+  ApiConflictResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiParam,
+  ApiTags,
+  ApiUnauthorizedResponse,
+} from '@nestjs/swagger';
 import { AuthService } from '@/core/auth/auth.service';
 import { CreateUserRequest } from '@/core/auth/dto/create-user-request.dto';
 import { SignInRequest } from '@/core/auth/dto/sign-in-request.dto';
@@ -9,28 +19,79 @@ import { JwtRefreshGuard } from '@/common/guards/jwt-refresh.guard';
 import { SendOtpRequest } from '@/core/auth/dto/send-otp-request.dto';
 import { VerifyOtpRequest } from '@/core/auth/dto/verify-otp-request.dto';
 
+@ApiTags('Auth')
 @Controller('auth')
 @IsPublic()
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post('sign-up')
+  @ApiOperation({
+    summary: 'Register a new account',
+    description: 'Creates a USER-role account and returns a fresh access/refresh token pair.',
+  })
+  @ApiOkResponse({
+    description: 'Account created',
+    schema: {
+      example: {
+        id: '6b0a0e1e-5f55-4a3a-9a9b-3a4f2c8a0c1e',
+        accessToken: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+        refreshToken: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+      },
+    },
+  })
+  @ApiConflictResponse({ description: 'Phone number already registered' })
   signUp(@Body() body: CreateUserRequest) {
     return this.authService.signUp(body);
   }
 
   @Post('sign-in')
+  @ApiOperation({
+    summary: 'Sign in with phone + password',
+    description: 'Returns a new access/refresh token pair.',
+  })
+  @ApiOkResponse({
+    description: 'Authenticated',
+    schema: {
+      example: {
+        accessToken: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+        refreshToken: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+      },
+    },
+  })
+  @ApiBadRequestResponse({ description: 'Wrong phone number or password' })
   signIn(@Body() body: SignInRequest) {
     return this.authService.signIn(body);
   }
 
   @Post('refresh')
   @UseGuards(JwtRefreshGuard)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({
+    summary: 'Exchange a refresh token for a new pair',
+    description: 'Send the refresh token in the `Authorization: Bearer <refreshToken>` header.',
+  })
+  @ApiOkResponse({
+    description: 'Fresh token pair issued',
+    schema: {
+      example: {
+        accessToken: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+        refreshToken: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+      },
+    },
+  })
+  @ApiUnauthorizedResponse({ description: 'Refresh token missing, expired, or invalid' })
   refreshTokens(@RequestUser() user: ReqUser) {
     return this.authService.refreshTokens(user.id, user.role);
   }
 
   @Get('check/:phoneNumber')
+  @ApiOperation({
+    summary: 'Check whether a phone number is available for sign-up',
+    description: '`status: true` means the number is free; `false` means it is already registered.',
+  })
+  @ApiParam({ name: 'phoneNumber', example: '998901234567', description: '12-digit phone number' })
+  @ApiOkResponse({ schema: { example: { status: true } } })
   async checkPhoneNumber(@Param('phoneNumber') phoneNumber: string) {
     const exists = await this.authService.checkPhoneNumber(phoneNumber);
 
@@ -40,6 +101,14 @@ export class AuthController {
   }
 
   @Post('send-otp')
+  @ApiOperation({
+    summary: 'Send a 5-digit SMS verification code',
+    description: 'Returns the OTP session id to use with `verify-otp`. The code is delivered via Eskiz SMS.',
+  })
+  @ApiOkResponse({
+    description: 'OTP sent',
+    schema: { example: { id: 'a3b8e6e0-f6b1-4f6e-8c1e-2d5b7e5e0a11' } },
+  })
   async sendOtp(@Body() body: SendOtpRequest) {
     const otp = await this.authService.sendOtp(body);
 
@@ -49,6 +118,17 @@ export class AuthController {
   }
 
   @Post('verify-otp/:otpId')
+  @ApiOperation({
+    summary: 'Verify the SMS code for a previously issued OTP session',
+    description: 'Each session allows up to 3 attempts and expires after 15 minutes.',
+  })
+  @ApiParam({
+    name: 'otpId',
+    description: 'OTP session id returned by `send-otp`',
+    example: 'a3b8e6e0-f6b1-4f6e-8c1e-2d5b7e5e0a11',
+  })
+  @ApiOkResponse({ description: 'Code accepted', schema: { example: { status: true } } })
+  @ApiBadRequestResponse({ description: 'Wrong session id, expired session, or wrong code' })
   async verifyOtp(@Param('otpId') otpId: string, @Body() body: VerifyOtpRequest) {
     await this.authService.verifyOtp(otpId, body);
 

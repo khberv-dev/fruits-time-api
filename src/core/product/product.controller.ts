@@ -1,4 +1,16 @@
 import { Body, Controller, Delete, Get, Param, Post, Put, Query, UploadedFile, UseInterceptors } from '@nestjs/common';
+import {
+  ApiBadRequestResponse,
+  ApiBearerAuth,
+  ApiBody,
+  ApiConsumes,
+  ApiCreatedResponse,
+  ApiForbiddenResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiParam,
+  ApiTags,
+} from '@nestjs/swagger';
 import { ProductService } from '@/core/product/product.service';
 import { BasicQuery } from '@/shared/dto/basic-query.dto';
 import { Role } from '@/common/decorators/role.decorator';
@@ -9,31 +21,66 @@ import { UpdateProductRequest } from '@/core/product/dto/update-product-request.
 import { IsPublic } from '@/common/decorators/is_public.decorator';
 import { SearchQuery } from '@/shared/dto/search-query.dto';
 
+const productExample = {
+  id: 'b1d4ee2c-2e9a-4f12-9a8b-3a4d5e6f7a8b',
+  image: '6f1c2a8f-5b6e-4d3b-9c2a-1f2c8d3a4e5b.jpg',
+  title: 'Apple Juice',
+  description: 'Cold-pressed apple juice with no added sugar.',
+  compound: ['vitamin C', 'potassium', 'fiber'],
+  price: 25000,
+  type: 'juice',
+  isActive: true,
+  createdAt: '2025-01-12T08:00:00.000Z',
+  updatedAt: '2025-01-12T08:00:00.000Z',
+};
+
+@ApiTags('Product')
 @Controller('catalog/:catalogId/product')
+@ApiParam({ name: 'catalogId', example: 'd7f9b3b4-9a4d-4b56-9b4a-3d2e3f1a0c4f', description: 'Parent catalog id' })
 export class ProductController {
   constructor(private readonly productService: ProductService) {}
 
   @Get()
   @IsPublic()
+  @ApiOperation({ summary: 'List active products in a catalog (public)' })
+  @ApiOkResponse({ description: 'Active products', schema: { example: [productExample] } })
   get(@Param('catalogId') catalogId: string, @Query() query: BasicQuery) {
     return this.productService.findAll(catalogId, query.locale);
   }
 
   @Get('search')
   @IsPublic()
+  @ApiOperation({
+    summary: 'Search products by title or compound (public)',
+    description: 'Case-insensitive ILIKE match against the chosen locale. Empty search returns an empty array.',
+  })
+  @ApiOkResponse({ description: 'Matching products', schema: { example: [productExample] } })
   search(@Query() query: SearchQuery) {
     return this.productService.search(query.locale, query.search);
   }
 
   @Get('all')
   @Role(UserRole.ADMIN)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'List all products in a catalog including inactive (admin only)' })
+  @ApiOkResponse({ description: 'All products', schema: { example: [productExample] } })
+  @ApiForbiddenResponse({ description: 'Caller is not an admin' })
   getAll(@Param('catalogId') catalogId: string, @Query() query: BasicQuery) {
     return this.productService.findAll(catalogId, query.locale, false);
   }
 
   @Post()
   @Role(UserRole.ADMIN)
+  @ApiBearerAuth('access-token')
   @UseInterceptors(uploadFileInterceptor('product'))
+  @ApiOperation({
+    summary: 'Create a product (admin only)',
+    description: 'Multipart upload. Localized fields are stored under the `locale` query param.',
+  })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({ type: CreateProductRequest })
+  @ApiCreatedResponse({ schema: { example: { message: 'Produkt yaratildi' } } })
+  @ApiForbiddenResponse({ description: 'Caller is not an admin' })
   async create(
     @Param('catalogId') catalogId: string,
     @Query() query: BasicQuery,
@@ -49,7 +96,17 @@ export class ProductController {
 
   @Put(':productId')
   @Role(UserRole.ADMIN)
+  @ApiBearerAuth('access-token')
   @UseInterceptors(uploadFileInterceptor('product'))
+  @ApiOperation({
+    summary: 'Update a product (admin only)',
+    description: 'Multipart upload. Only provided fields are updated; localized fields merge into the chosen `locale`.',
+  })
+  @ApiConsumes('multipart/form-data')
+  @ApiParam({ name: 'productId', example: 'b1d4ee2c-2e9a-4f12-9a8b-3a4d5e6f7a8b' })
+  @ApiBody({ type: UpdateProductRequest })
+  @ApiOkResponse({ schema: { example: { message: 'Produkt yangilandi' } } })
+  @ApiBadRequestResponse({ description: 'Product not found' })
   async update(
     @Param('productId') productId: string,
     @Query() query: BasicQuery,
@@ -65,6 +122,10 @@ export class ProductController {
 
   @Delete(':productId')
   @Role(UserRole.ADMIN)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Delete a product (admin only)' })
+  @ApiParam({ name: 'productId', example: 'b1d4ee2c-2e9a-4f12-9a8b-3a4d5e6f7a8b' })
+  @ApiOkResponse({ schema: { example: { message: "Produkt o'chirildi" } } })
   async delete(@Param('productId') productId: string) {
     await this.productService.delete(productId);
 
