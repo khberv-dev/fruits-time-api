@@ -1,4 +1,5 @@
 import bcrypt from 'bcrypt';
+import { randomInt } from 'node:crypto';
 
 export function encryptPassword(password: string) {
   return bcrypt.hash(password, 10);
@@ -12,6 +13,17 @@ export function randomOTP() {
   return Math.round(Math.random() * 100000)
     .toString()
     .padStart(5, '0');
+}
+
+const REFERRAL_CHARSET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+const REFERRAL_LENGTH = 7;
+
+export function generateReferralCode(): string {
+  let code = '';
+  for (let i = 0; i < REFERRAL_LENGTH; i++) {
+    code += REFERRAL_CHARSET[randomInt(REFERRAL_CHARSET.length)];
+  }
+  return code;
 }
 
 export function getObjectDefaultValue(obj: object, def: any) {

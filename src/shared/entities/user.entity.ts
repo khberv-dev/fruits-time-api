@@ -1,4 +1,13 @@
-import { Column, CreateDateColumn, Entity, OneToMany, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
+import {
+  Column,
+  CreateDateColumn,
+  Entity,
+  JoinColumn,
+  ManyToOne,
+  OneToMany,
+  PrimaryGeneratedColumn,
+  UpdateDateColumn,
+} from 'typeorm';
 import { UserRole } from '@/shared/enums/user-role.enum';
 import { Order } from '@/shared/entities/order.entity';
 import { Gender } from '@/shared/enums/gender.enum';
@@ -28,6 +37,13 @@ export class User {
 
   @Column({ type: 'enum', enum: Gender, nullable: true })
   gender: Gender;
+
+  @Column({ name: 'referral_code', unique: true, nullable: true })
+  referralCode: string;
+
+  @ManyToOne(() => User, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'referred_by_id' })
+  referredBy: User;
 
   @OneToMany(() => Order, (order) => order.user)
   orders: Order[];

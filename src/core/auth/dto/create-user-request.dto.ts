@@ -1,5 +1,5 @@
-import { IsNotEmpty, IsString } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import { IsNotEmpty, IsOptional, IsString, Matches } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateUserRequest {
   @ApiProperty({ example: 'Aziz', description: "User's first name" })
@@ -16,4 +16,13 @@ export class CreateUserRequest {
   @IsString()
   @IsNotEmpty()
   password: string;
+
+  @ApiPropertyOptional({
+    example: 'A2B7K9D',
+    description: '7-character referral code from another user (uppercase letters and digits)',
+  })
+  @IsOptional()
+  @IsString()
+  @Matches(/^[A-Z0-9]{7}$/, { message: "Referal kod 7 ta katta harf yoki raqamdan iborat bo'lishi kerak" })
+  referralCode?: string;
 }

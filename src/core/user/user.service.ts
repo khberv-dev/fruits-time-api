@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, Injectable, InternalServerErrorException, UnauthorizedException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { User } from '@/shared/entities/user.entity';
 import { Repository } from 'typeorm';
@@ -6,8 +6,16 @@ import { UserRole } from '@/shared/enums/user-role.enum';
 import { UpdateUserRequest } from '@/core/user/dto/update-user-request.dto';
 import dayjs from 'dayjs';
 import customParseFormat from 'dayjs/plugin/customParseFormat';
+import { generateReferralCode } from '@/shared/utils/lib';
+import { UserStatus } from '@/shared/enums/user-status.enum';
 
 dayjs.extend(customParseFormat);
+
+export function computeUserStatus(referralCount: number): UserStatus {
+  if (referralCount > 15) return UserStatus.VIP;
+  if (referralCount >= 1) return UserStatus.GOLD;
+  return UserStatus.SILVER;
+}
 
 @Injectable()
 export class UserService {
@@ -24,9 +32,17 @@ export class UserService {
       throw new UnauthorizedException();
     }
 
+    const referralCount = await this.userRepo.count({
+      where: { referredBy: { id: userId } },
+    });
+
     const { password, ...userData } = user;
 
-    return userData;
+    return {
+      ...userData,
+      referralCount,
+      status: computeUserStatus(referralCount),
+    };
   }
 
   async findAllPaginate(page: number, pageSize: number) {
@@ -84,5 +100,32 @@ export class UserService {
     }
 
     return this.userRepo.save(user);
+  }
+
+  async getReferral(userId: string) {
+    const user = await this.userRepo.findOne({ where: { id: userId } });
+    if (!user) {
+      throw new UnauthorizedException();
+    }
+
+    if (!user.referralCode) {
+      user.referralCode = await this.generateUniqueReferralCode();
+      await this.userRepo.save(user);
+    }
+
+    const count = await this.userRepo.count({
+      where: { referredBy: { id: userId } },
+    });
+
+    return { code: user.referralCode, count, status: computeUserStatus(count) };
+  }
+
+  private async generateUniqueReferralCode(): Promise<string> {
+    for (let i = 0; i < 5; i++) {
+      const code = generateReferralCode();
+      const exists = await this.userRepo.exists({ where: { referralCode: code } });
+      if (!exists) return code;
+    }
+    throw new InternalServerErrorException('Failed to generate unique referral code');
   }
 }

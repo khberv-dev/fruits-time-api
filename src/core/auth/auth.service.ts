@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, InternalServerErrorException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { User } from '@/shared/entities/user.entity';
 import { Repository } from 'typeorm';
@@ -6,7 +6,7 @@ import { JwtService } from '@nestjs/jwt';
 import { UserRole } from '@/shared/enums/user-role.enum';
 import { ConfigService } from '@nestjs/config';
 import { CreateUserRequest } from '@/core/auth/dto/create-user-request.dto';
-import { encryptPassword, randomOTP, validatePassword } from '@/shared/utils/lib';
+import { encryptPassword, generateReferralCode, randomOTP, validatePassword } from '@/shared/utils/lib';
 import { SignInRequest } from '@/core/auth/dto/sign-in-request.dto';
 import { SendOtpRequest } from '@/core/auth/dto/send-otp-request.dto';
 import { Otp } from '@/shared/entities/otp.entity';
@@ -57,6 +57,15 @@ export class AuthService {
     return isValidPassword ? user : null;
   }
 
+  private async generateUniqueReferralCode(): Promise<string> {
+    for (let i = 0; i < 5; i++) {
+      const code = generateReferralCode();
+      const exists = await this.userRepo.exists({ where: { referralCode: code } });
+      if (!exists) return code;
+    }
+    throw new InternalServerErrorException('Failed to generate unique referral code');
+  }
+
   async signUp(data: CreateUserRequest) {
     const existingUser = await this.userRepo.exists({
       where: {
@@ -68,13 +77,25 @@ export class AuthService {
       throw new ConflictException('Boshqa telefon raqam kiriting');
     }
 
+    let referredBy: User | undefined;
+    if (data.referralCode) {
+      const referrer = await this.userRepo.findOne({ where: { referralCode: data.referralCode } });
+      if (!referrer) {
+        throw new BadRequestException('Referal kod xato');
+      }
+      referredBy = referrer;
+    }
+
     const passwordHash = await encryptPassword(data.password);
+    const referralCode = await this.generateUniqueReferralCode();
 
     const user = await this.userRepo.save({
       firstName: data.firstName,
       phoneNumber: data.phoneNumber,
       password: passwordHash,
       role: UserRole.USER,
+      referralCode,
+      referredBy,
     });
 
     const tokens = this.issueTokens(user.id, user.role);

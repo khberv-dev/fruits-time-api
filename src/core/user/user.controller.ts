@@ -23,6 +23,9 @@ const userExample = {
   weight: 72,
   height: 178,
   gender: 'male',
+  referralCode: 'A2B7K9D',
+  referralCount: 4,
+  status: 'silver',
   role: 'user',
   createdAt: '2025-01-15T08:23:11.512Z',
   updatedAt: '2025-02-02T10:11:00.000Z',
@@ -40,6 +43,23 @@ export class UserController {
   @ApiUnauthorizedResponse({ description: 'Missing or invalid access token' })
   getMe(@RequestUser() user: ReqUser) {
     return this.userService.findById(user.id);
+  }
+
+  @Get('me/referral')
+  @ApiOperation({
+    summary: "Get the authenticated user's referral code, invited-user count, and status badge",
+    description:
+      'Returns the 7-character referral code (uppercase letters and digits), the number of accounts that registered using it, ' +
+      'and the status badge derived from that count: `silver` (< 10), `gold` (10–15), `vip` (> 15). ' +
+      'A code is generated lazily on first call if the account does not have one yet.',
+  })
+  @ApiOkResponse({
+    description: 'Referral code, invited-user count, and status badge',
+    schema: { example: { code: 'A2B7K9D', count: 4, status: 'silver' } },
+  })
+  @ApiUnauthorizedResponse({ description: 'Missing or invalid access token' })
+  getReferral(@RequestUser() user: ReqUser) {
+    return this.userService.getReferral(user.id);
   }
 
   @Get()
