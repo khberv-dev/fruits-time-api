@@ -31,6 +31,7 @@ async function bootstrap() {
     .addTag('Catalog', 'Product catalogs (admin CRUD, public read)')
     .addTag('Product', 'Products inside a catalog (admin CRUD, public read + search)')
     .addTag('Banner', 'Marketing banners (admin write, public read)')
+    .addTag('Order', 'User orders with auto-incremented POS id')
     .addTag('Stats', 'Admin dashboard summaries and trend series')
     .addTag('Assistant', 'AI nutritionist chat')
     .build();

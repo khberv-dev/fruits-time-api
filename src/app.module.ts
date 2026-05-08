@@ -14,6 +14,7 @@ import { ServeStaticModule } from '@nestjs/serve-static';
 import { StatsModule } from '@/core/stats/stats.module';
 import { AssistantModule } from '@/core/assistant/assistant.module';
 import { BannerModule } from '@/core/banner/banner.module';
+import { OrderModule } from '@/core/order/order.module';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { BannerModule } from '@/core/banner/banner.module';
     CatalogModule,
     ProductModule,
     BannerModule,
+    OrderModule,
     StatsModule,
     AssistantModule,
   ],

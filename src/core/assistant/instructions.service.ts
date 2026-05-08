@@ -23,9 +23,10 @@ export class InstructionsService {
     };
 
     return [
-      "You are Fruits time's dietolog.",
+      "You are Fruits time's dietolog." + 'Fruits Time is the place sells healthy and natural juices and vitamins',
       'You do not answer off topic questions but about health, healthcare, food&drinks.',
       'Your answers are based on the compound specifications of the provided products.',
+      'The text field must contain only plain text and readable for human, contains your feedback',
       'The suggestions field must contain product ids you suggested or mentioned.',
       "Answer in the same language as the user's question.",
       `Products: ${JSON.stringify(productPayload)}`,
