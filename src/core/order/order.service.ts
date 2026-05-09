@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { Order } from '@/shared/entities/order.entity';
@@ -6,22 +6,27 @@ import { Product } from '@/shared/entities/product.entity';
 import { User } from '@/shared/entities/user.entity';
 import { Locale } from '@/shared/enums/locale.enum';
 import { CreateOrderRequest } from '@/core/order/dto/create-order-request.dto';
+import { PosterService } from '@/core/poster/poster.service';
 
 @Injectable()
 export class OrderService {
+  private readonly logger = new Logger('Order Service');
+
   constructor(
     @InjectRepository(Order) private readonly orderRepo: Repository<Order>,
     @InjectRepository(Product) private readonly productRepo: Repository<Product>,
+    @InjectRepository(User) private readonly userRepo: Repository<User>,
+    private readonly posterService: PosterService,
   ) {}
 
   async create(userId: string, locale: Locale, data: CreateOrderRequest) {
     const productIds = [...new Set(data.items.map((item) => item.productId))];
 
-    const activeCount = await this.productRepo.count({
+    const products = await this.productRepo.find({
       where: { id: In(productIds), isActive: true },
     });
 
-    if (activeCount !== productIds.length) {
+    if (products.length !== productIds.length) {
       throw new BadRequestException("Mahsulot topilmadi yoki sotuvda yo'q");
     }
 
@@ -38,7 +43,44 @@ export class OrderService {
       relations: ['items', 'items.product'],
     });
 
+    const posOrderId = await this.sendToPoster(userId, products, data);
+    if (posOrderId !== null) {
+      order.posId = posOrderId;
+      await this.orderRepo.save(order);
+    }
+
     return this.mapOrder(order, locale);
+  }
+
+  private async sendToPoster(
+    userId: string,
+    products: Product[],
+    data: CreateOrderRequest,
+  ): Promise<number | null> {
+    const user = await this.userRepo.findOne({ where: { id: userId } });
+    if (!user?.posId) {
+      this.logger.warn(`Skipping POS order: user ${userId} has no posId`);
+      return null;
+    }
+
+    const productById = new Map(products.map((product) => [product.id, product]));
+    const posterProducts: { id: number; count: number }[] = [];
+
+    for (const item of data.items) {
+      const product = productById.get(item.productId);
+      if (!product?.posId) {
+        this.logger.warn(`Skipping POS order: product ${item.productId} has no posId`);
+        return null;
+      }
+      posterProducts.push({ id: product.posId, count: item.quantity });
+    }
+
+    return this.posterService.createOrder({
+      spotId: 0,
+      autoAccept: false,
+      client: { id: user.posId },
+      products: posterProducts,
+    });
   }
 
   async listForUser(userId: string, locale: Locale, page: number, pageSize: number) {
@@ -60,7 +102,7 @@ export class OrderService {
   private mapOrder(order: Order, locale: Locale) {
     return {
       id: order.id,
-      orderId: order.orderId,
+      posId: order.posId,
       status: order.status,
       createdAt: order.createdAt,
       updatedAt: order.updatedAt,

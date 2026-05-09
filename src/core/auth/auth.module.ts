@@ -9,6 +9,7 @@ import { JwtAccessStrategy } from '@/core/auth/strategies/jwt-access.strategy';
 import { JwtRefreshStrategy } from '@/core/auth/strategies/jwt-refresh.strategy';
 import { Otp } from '@/shared/entities/otp.entity';
 import { NotifyModule } from '@/core/notify/notify.module';
+import { PosterModule } from '@/core/poster/poster.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { NotifyModule } from '@/core/notify/notify.module';
     }),
     TypeOrmModule.forFeature([User, Otp]),
     NotifyModule,
+    PosterModule,
   ],
   controllers: [AuthController],
   providers: [JwtAccessStrategy, JwtRefreshStrategy, AuthService],

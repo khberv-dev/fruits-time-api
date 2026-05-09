@@ -35,6 +35,12 @@ export class CreateProductRequest {
   @IsEnum(ProductType)
   type: ProductType;
 
+  @ApiPropertyOptional({ example: 1024, description: 'External POS system product id' })
+  @IsOptional()
+  @IsInt()
+  @Type(() => Number)
+  posId?: number;
+
   @ApiPropertyOptional({
     type: 'string',
     format: 'binary',

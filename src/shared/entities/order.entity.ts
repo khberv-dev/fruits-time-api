@@ -2,7 +2,6 @@ import {
   Column,
   CreateDateColumn,
   Entity,
-  Generated,
   JoinColumn,
   ManyToOne,
   OneToMany,
@@ -18,16 +17,15 @@ export class Order {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ name: 'order_id', type: 'int', unique: true })
-  @Generated('increment')
-  orderId: number;
-
   @ManyToOne(() => User, (user) => user.orders)
   @JoinColumn({ name: 'user_id' })
   user: User;
 
   @Column({ type: 'enum', enum: OrderStatus, default: OrderStatus.CREATED })
   status: OrderStatus;
+
+  @Column({ name: 'pos_id', type: 'int', nullable: true })
+  posId: number | null;
 
   @OneToMany(() => OrderItem, (item) => item.order, { cascade: true })
   items: OrderItem[];

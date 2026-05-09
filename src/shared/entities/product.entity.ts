@@ -36,6 +36,9 @@ export class Product {
   @Column({ type: 'enum', enum: ProductType, default: ProductType.JUICE })
   type: ProductType;
 
+  @Column({ name: 'pos_id', type: 'int', nullable: true })
+  posId: number | null;
+
   @ManyToOne(() => Catalog, (catalog) => catalog.products)
   @JoinColumn({ name: 'catalog_id' })
   catalog: Catalog;

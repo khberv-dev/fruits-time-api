@@ -70,6 +70,7 @@ export class ProductService {
       price: data.price,
       image: fileName,
       type: data.type,
+      posId: data.posId ?? null,
       catalog: {
         id: catalogId,
       },
@@ -113,6 +114,10 @@ export class ProductService {
 
     if (data.type) {
       product.type = data.type;
+    }
+
+    if (data.posId !== undefined) {
+      product.posId = data.posId;
     }
 
     return this.productRepo.save(product);

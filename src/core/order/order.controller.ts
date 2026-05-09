@@ -17,7 +17,7 @@ import { PaginationQuery } from '@/shared/dto/pagination-query.dto';
 
 const orderExample = {
   id: '7e9f2d3b-1234-4abc-9d8e-2c4f6a1b3c5d',
-  orderId: 1042,
+  posId: 45,
   status: 'created',
   createdAt: '2025-05-04T10:15:00.000Z',
   updatedAt: '2025-05-04T10:15:00.000Z',
@@ -49,7 +49,7 @@ export class OrderController {
   @ApiOperation({
     summary: 'Place a new order for the authenticated user',
     description:
-      'Creates an order with the listed product quantities. The auto-incremented `orderId` (int) is returned for POS-system integration. ' +
+      'Creates an order with the listed product quantities. The POS-system order id is returned as `posId` once the order has been forwarded. ' +
       'All products in the order must exist and be active.',
   })
   @ApiCreatedResponse({ description: 'Order created', schema: { example: orderExample } })

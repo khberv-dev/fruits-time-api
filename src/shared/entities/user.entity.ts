@@ -48,6 +48,9 @@ export class User {
   @OneToMany(() => Order, (order) => order.user)
   orders: Order[];
 
+  @Column({ name: 'pos_id', type: 'int', nullable: true })
+  posId: number | null;
+
   @Column({ type: 'enum', enum: UserRole })
   role: UserRole;
 

@@ -13,6 +13,7 @@ import { Otp } from '@/shared/entities/otp.entity';
 import { VerifyOtpRequest } from '@/core/auth/dto/verify-otp-request.dto';
 import dayjs from 'dayjs';
 import { SmsService } from '@/core/notify/sms.service';
+import { PosterService } from '@/core/poster/poster.service';
 
 @Injectable()
 export class AuthService {
@@ -22,6 +23,7 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly config: ConfigService,
     private readonly smsService: SmsService,
+    private readonly posterService: PosterService,
   ) {}
 
   private issueTokens(userId: string, role: UserRole) {
@@ -97,6 +99,12 @@ export class AuthService {
       referralCode,
       referredBy,
     });
+
+    const posId = await this.posterService.createClient(user.firstName, user.phoneNumber);
+    if (posId !== null) {
+      user.posId = posId;
+      await this.userRepo.save(user);
+    }
 
     const tokens = this.issueTokens(user.id, user.role);
 
