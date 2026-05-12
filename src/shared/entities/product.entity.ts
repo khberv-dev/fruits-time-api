@@ -37,7 +37,7 @@ export class Product {
   type: ProductType;
 
   @Column({ name: 'pos_id', type: 'int', nullable: true })
-  posId: number | null;
+  posId: number;
 
   @ManyToOne(() => Catalog, (catalog) => catalog.products)
   @JoinColumn({ name: 'catalog_id' })

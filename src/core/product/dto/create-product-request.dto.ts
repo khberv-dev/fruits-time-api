@@ -39,7 +39,7 @@ export class CreateProductRequest {
   @IsOptional()
   @IsInt()
   @Type(() => Number)
-  posId?: number;
+  posId: number;
 
   @ApiPropertyOptional({
     type: 'string',
