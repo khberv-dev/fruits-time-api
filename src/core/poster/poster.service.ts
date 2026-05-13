@@ -34,7 +34,9 @@ export class PosterService {
       });
 
       if (data.error !== undefined && data.error !== 0) {
-        this.logger.error(`createClient failed for ${clientName} (${phone}): [${data.error['message']}]`);
+        this.logger.error(
+          `createClient failed for ${clientName} (${phone}): [${data.error['message'] || JSON.stringify(data.error)}]`,
+        );
         return null;
       }
 
