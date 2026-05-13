@@ -1,5 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import axios, { AxiosInstance } from 'axios';
+import { Agent as HttpAgent } from 'http';
+import { Agent as HttpsAgent } from 'https';
 import { ConfigService } from '@nestjs/config';
 import { PosterCreateOrderInput } from '@/core/poster/types/poster-create-order-input.type';
 import { PosterResponse } from '@/core/poster/types/poster-response.type';
@@ -11,9 +13,16 @@ export class PosterService {
   private readonly apiClient: AxiosInstance;
 
   constructor(private readonly config: ConfigService) {
+    const httpAgent = new HttpAgent({ keepAlive: true });
+    const httpsAgent = new HttpsAgent({ keepAlive: true });
+    httpAgent.setMaxListeners(0);
+    httpsAgent.setMaxListeners(0);
+
     this.apiClient = axios.create({
       baseURL: this.config.getOrThrow<string>('POSTER_API_URL'),
       params: { token: this.config.getOrThrow<string>('POSTER_API_KEY') },
+      httpAgent,
+      httpsAgent,
     });
   }
 
@@ -24,11 +33,19 @@ export class PosterService {
         phone,
       });
 
+      if (data.error !== undefined && data.error !== 0) {
+        this.logger.error(`createClient failed for ${clientName} (${phone}): [${data.error['message']}]`);
+        return null;
+      }
+
       const id = data.response;
-      if (id === undefined || id === null) return null;
+      if (id === undefined || id === null) {
+        this.logger.error(`createClient failed for ${clientName} (${phone}): empty response ${JSON.stringify(data)}`);
+        return null;
+      }
       return typeof id === 'number' ? id : Number(id);
     } catch (error) {
-      this.logger.error(`createClient failed: ${this.formatError(error)}`);
+      this.logger.error(`createClient failed for ${clientName} (${phone}): ${this.formatError(error)}`);
       return null;
     }
   }
@@ -45,8 +62,17 @@ export class PosterService {
         })),
       });
 
+      if (data.error !== undefined && data.error !== 0) {
+        this.logger.error(`createOrder failed: [${data.error}] ${data.message ?? 'no message'}`);
+        return null;
+      }
+
       const id = data.response?.id;
-      return typeof id === 'number' ? id : id ? Number(id) : null;
+      if (id === undefined || id === null) {
+        this.logger.error(`createOrder failed: empty response ${JSON.stringify(data)}`);
+        return null;
+      }
+      return typeof id === 'number' ? id : Number(id);
     } catch (error) {
       this.logger.error(`createOrder failed: ${this.formatError(error)}`);
       return null;
@@ -55,7 +81,9 @@ export class PosterService {
 
   private formatError(error: unknown): string {
     if (axios.isAxiosError(error)) {
-      return `${error.message} ${JSON.stringify(error.response?.data ?? {})}`;
+      const status = error.response?.status ?? 'no-status';
+      const body = error.response?.data ? JSON.stringify(error.response.data) : 'no-body';
+      return `[${status}] ${error.message} ${body}`;
     }
     return error instanceof Error ? error.message : String(error);
   }
