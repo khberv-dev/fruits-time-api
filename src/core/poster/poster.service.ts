@@ -30,6 +30,7 @@ export class PosterService {
     try {
       const { data } = await this.apiClient.post<PosterResponse<number | string>>('/clients.createClient', {
         client_name: clientName,
+        client_groups_id_client: 0,
         phone,
       });
 
