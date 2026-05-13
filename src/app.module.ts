@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { ConfigModule } from '@nestjs/config';
+import { ScheduleModule } from '@nestjs/schedule';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { dataSource } from '@/shared/config/database.config';
 import { AuthModule } from '@/core/auth/auth.module';
@@ -21,6 +22,7 @@ import { OrderModule } from '@/core/order/order.module';
     ConfigModule.forRoot({
       isGlobal: true,
     }),
+    ScheduleModule.forRoot(),
     TypeOrmModule.forRoot(dataSource.options),
     ServeStaticModule.forRoot({
       rootPath: 'uploads',
