@@ -1,13 +1,21 @@
-import { BadRequestException, Injectable, InternalServerErrorException, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+  OnApplicationBootstrap,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { User } from '@/shared/entities/user.entity';
-import { Repository } from 'typeorm';
+import { IsNull, Repository } from 'typeorm';
 import { UserRole } from '@/shared/enums/user-role.enum';
 import { UpdateUserRequest } from '@/core/user/dto/update-user-request.dto';
 import dayjs from 'dayjs';
 import customParseFormat from 'dayjs/plugin/customParseFormat';
 import { generateReferralCode } from '@/shared/utils/lib';
 import { UserStatus } from '@/shared/enums/user-status.enum';
+import { PosterService } from '@/core/poster/poster.service';
 
 dayjs.extend(customParseFormat);
 
@@ -33,8 +41,35 @@ export function computeStatusProgress(referralCount: number) {
 }
 
 @Injectable()
-export class UserService {
-  constructor(@InjectRepository(User) private readonly userRepo: Repository<User>) {}
+export class UserService implements OnApplicationBootstrap {
+  private readonly logger = new Logger('User Service');
+
+  constructor(
+    @InjectRepository(User) private readonly userRepo: Repository<User>,
+    private readonly posterService: PosterService,
+  ) {}
+
+  onApplicationBootstrap() {
+    void this.syncMissingPosIds();
+  }
+
+  async syncMissingPosIds() {
+    const users = await this.userRepo.find({ where: { posId: IsNull() } });
+    if (users.length === 0) return;
+
+    this.logger.log(`Syncing ${users.length} user(s) to POS`);
+
+    for (const user of users) {
+      const posId = await this.posterService.createClient(user.firstName, user.phoneNumber);
+      if (posId !== null) {
+        user.posId = posId;
+        await this.userRepo.save(user);
+        this.logger.log(`Synced ${user.firstName} (${user.phoneNumber}) → posId=${posId}`);
+      } else {
+        this.logger.warn(`Unable sync ${user.firstName} (${user.phoneNumber})`);
+      }
+    }
+  }
 
   async findById(userId: string) {
     const user = await this.userRepo.findOne({

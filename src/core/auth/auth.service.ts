@@ -1,4 +1,10 @@
-import { BadRequestException, ConflictException, Injectable, InternalServerErrorException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { User } from '@/shared/entities/user.entity';
 import { Repository } from 'typeorm';
@@ -17,6 +23,8 @@ import { PosterService } from '@/core/poster/poster.service';
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger('Auth Service');
+
   constructor(
     @InjectRepository(User) private readonly userRepo: Repository<User>,
     @InjectRepository(Otp) private readonly otpRepo: Repository<Otp>,
@@ -104,6 +112,9 @@ export class AuthService {
     if (posId !== null) {
       user.posId = posId;
       await this.userRepo.save(user);
+      this.logger.log(`Synced ${user.firstName} (${user.phoneNumber}) → posId=${posId}`);
+    } else {
+      this.logger.warn(`Unable sync ${user.firstName} (${user.phoneNumber})`);
     }
 
     const tokens = this.issueTokens(user.id, user.role);
