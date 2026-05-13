@@ -12,9 +12,24 @@ import { UserStatus } from '@/shared/enums/user-status.enum';
 dayjs.extend(customParseFormat);
 
 export function computeUserStatus(referralCount: number): UserStatus {
-  if (referralCount > 15) return UserStatus.VIP;
+  if (referralCount > 10) return UserStatus.PREMIUM;
+  if (referralCount > 5) return UserStatus.VIP;
   if (referralCount >= 1) return UserStatus.GOLD;
   return UserStatus.SILVER;
+}
+
+export function computeStatusProgress(referralCount: number) {
+  const status = computeUserStatus(referralCount);
+  if (status === UserStatus.SILVER) {
+    return { status, nextStatus: UserStatus.GOLD, remaining: 1 - referralCount };
+  }
+  if (status === UserStatus.GOLD) {
+    return { status, nextStatus: UserStatus.VIP, remaining: 6 - referralCount };
+  }
+  if (status === UserStatus.VIP) {
+    return { status, nextStatus: UserStatus.PREMIUM, remaining: 11 - referralCount };
+  }
+  return { status, nextStatus: null, remaining: 0 };
 }
 
 @Injectable()
@@ -117,7 +132,7 @@ export class UserService {
       where: { referredBy: { id: userId } },
     });
 
-    return { code: user.referralCode, count, status: computeUserStatus(count) };
+    return { code: user.referralCode, count, ...computeStatusProgress(count) };
   }
 
   private async generateUniqueReferralCode(): Promise<string> {

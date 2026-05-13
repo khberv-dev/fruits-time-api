@@ -52,11 +52,7 @@ export class OrderService {
     return this.mapOrder(order, locale);
   }
 
-  private async sendToPoster(
-    userId: string,
-    products: Product[],
-    data: CreateOrderRequest,
-  ): Promise<number | null> {
+  private async sendToPoster(userId: string, products: Product[], data: CreateOrderRequest): Promise<number | null> {
     const user = await this.userRepo.findOne({ where: { id: userId } });
     if (!user?.posId) {
       this.logger.warn(`Skipping POS order: user ${userId} has no posId`);

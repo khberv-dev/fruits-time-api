@@ -50,12 +50,13 @@ export class UserController {
     summary: "Get the authenticated user's referral code, invited-user count, and status badge",
     description:
       'Returns the 7-character referral code (uppercase letters and digits), the number of accounts that registered using it, ' +
-      'and the status badge derived from that count: `silver` (< 10), `gold` (10–15), `vip` (> 15). ' +
+      'the current status badge derived from that count: `silver` (0), `gold` (1–5), `vip` (6–10), `premium` (> 10), ' +
+      'plus the next tier and number of remaining referrals needed to reach it (`nextStatus` is `null` and `remaining` is `0` when already `premium`). ' +
       'A code is generated lazily on first call if the account does not have one yet.',
   })
   @ApiOkResponse({
     description: 'Referral code, invited-user count, and status badge',
-    schema: { example: { code: 'A2B7K9D', count: 4, status: 'silver' } },
+    schema: { example: { code: 'A2B7K9D', count: 4, status: 'gold', nextStatus: 'vip', remaining: 2 } },
   })
   @ApiUnauthorizedResponse({ description: 'Missing or invalid access token' })
   getReferral(@RequestUser() user: ReqUser) {
