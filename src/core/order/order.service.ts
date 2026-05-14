@@ -4,6 +4,7 @@ import { In, Repository } from 'typeorm';
 import { Order } from '@/shared/entities/order.entity';
 import { Product } from '@/shared/entities/product.entity';
 import { User } from '@/shared/entities/user.entity';
+import { Branch } from '@/shared/entities/branch.entity';
 import { Locale } from '@/shared/enums/locale.enum';
 import { CreateOrderRequest } from '@/core/order/dto/create-order-request.dto';
 import { PosterService } from '@/core/poster/poster.service';
@@ -16,18 +17,22 @@ export class OrderService {
     @InjectRepository(Order) private readonly orderRepo: Repository<Order>,
     @InjectRepository(Product) private readonly productRepo: Repository<Product>,
     @InjectRepository(User) private readonly userRepo: Repository<User>,
+    @InjectRepository(Branch) private readonly branchRepo: Repository<Branch>,
     private readonly posterService: PosterService,
   ) {}
 
   async create(userId: string, locale: Locale, data: CreateOrderRequest) {
     const productIds = [...new Set(data.items.map((item) => item.productId))];
 
-    const products = await this.productRepo.find({
-      where: { id: In(productIds), isActive: true },
-    });
+    const products = await this.productRepo.find({ where: { id: In(productIds), isActive: true } });
+    const branch = await this.branchRepo.findOne({ where: { id: data.branchId, isActive: true } });
 
     if (products.length !== productIds.length) {
       throw new BadRequestException("Mahsulot topilmadi yoki sotuvda yo'q");
+    }
+
+    if (!branch) {
+      throw new BadRequestException('Filial topilmadi yoki faol emas');
     }
 
     const saved = await this.orderRepo.save({
@@ -43,7 +48,7 @@ export class OrderService {
       relations: ['items', 'items.product'],
     });
 
-    const posOrderId = await this.sendToPoster(userId, products, data);
+    const posOrderId = await this.sendToPoster(userId, products, data, branch.posId);
     if (posOrderId !== null) {
       order.posId = posOrderId;
       await this.orderRepo.save(order);
@@ -52,7 +57,12 @@ export class OrderService {
     return this.mapOrder(order, locale);
   }
 
-  private async sendToPoster(userId: string, products: Product[], data: CreateOrderRequest): Promise<number | null> {
+  private async sendToPoster(
+    userId: string,
+    products: Product[],
+    data: CreateOrderRequest,
+    spotId: number,
+  ): Promise<number | null> {
     const user = await this.userRepo.findOne({ where: { id: userId } });
     if (!user?.posId) {
       this.logger.warn(`Skipping POS order: user ${userId} has no posId`);
@@ -72,7 +82,7 @@ export class OrderService {
     }
 
     return this.posterService.createOrder({
-      spotId: 0,
+      spotId,
       autoAccept: false,
       client: { id: user.posId },
       products: posterProducts,

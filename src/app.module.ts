@@ -15,12 +15,15 @@ import { StatsModule } from '@/core/stats/stats.module';
 import { AssistantModule } from '@/core/assistant/assistant.module';
 import { BannerModule } from '@/core/banner/banner.module';
 import { OrderModule } from '@/core/order/order.module';
+import { BranchModule } from '@/core/branch/branch.module';
+import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
     }),
+    ScheduleModule.forRoot(),
     TypeOrmModule.forRoot(dataSource.options),
     ServeStaticModule.forRoot({
       rootPath: 'uploads',
@@ -35,6 +38,7 @@ import { OrderModule } from '@/core/order/order.module';
     ProductModule,
     BannerModule,
     OrderModule,
+    BranchModule,
     StatsModule,
     AssistantModule,
   ],

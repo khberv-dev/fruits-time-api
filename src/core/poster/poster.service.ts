@@ -6,6 +6,7 @@ import { ConfigService } from '@nestjs/config';
 import { PosterCreateOrderInput } from '@/core/poster/types/poster-create-order-input.type';
 import { PosterResponse } from '@/core/poster/types/poster-response.type';
 import { PosterOrderResponse } from '@/core/poster/types/poster-order-response.type';
+import { PosterSpot } from '@/core/poster/types/poster-spot.type';
 
 @Injectable()
 export class PosterService {
@@ -24,6 +25,22 @@ export class PosterService {
       httpAgent,
       httpsAgent,
     });
+  }
+
+  async getSpots(): Promise<PosterSpot[]> {
+    try {
+      const { data } = await this.apiClient.get<PosterResponse<PosterSpot[]>>('/spots.getSpots');
+
+      if (data.error !== undefined && data.error !== 0) {
+        this.logger.error(`getSpots failed: [${JSON.stringify(data.error)}]`);
+        return [];
+      }
+
+      return data.response ?? [];
+    } catch (error) {
+      this.logger.error(`getSpots failed: ${this.formatError(error)}`);
+      return [];
+    }
   }
 
   async createClient(clientName: string, phone: string): Promise<number | null> {

@@ -14,6 +14,10 @@ export class CreateOrderItem {
 }
 
 export class CreateOrderRequest {
+  @ApiProperty({ example: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', description: 'Branch UUID' })
+  @IsUUID()
+  branchId: string;
+
   @ApiProperty({
     type: [CreateOrderItem],
     description: 'Products in the order with their quantities. At least one item is required.',
