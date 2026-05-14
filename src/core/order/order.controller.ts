@@ -13,7 +13,6 @@ import { RequestUser } from '@/common/decorators/request-user.decorator';
 import type { ReqUser } from '@/shared/types/req-user.type';
 import { CreateOrderRequest } from '@/core/order/dto/create-order-request.dto';
 import { BasicQuery } from '@/shared/dto/basic-query.dto';
-import { PaginationQuery } from '@/shared/dto/pagination-query.dto';
 
 const orderExample = {
   id: '7e9f2d3b-1234-4abc-9d8e-2c4f6a1b3c5d',
@@ -32,6 +31,44 @@ const orderExample = {
         description: 'Cold-pressed apple juice with no added sugar.',
         compound: ['vitamin C', 'potassium', 'fiber'],
         price: 25000,
+        type: 'juice',
+        isActive: true,
+      },
+    },
+  ],
+};
+
+const orderExample2 = {
+  id: '0c2a1e8b-9d33-4f56-87ab-12cd34ef56ab',
+  posId: 46,
+  status: 'delivered',
+  createdAt: '2025-05-03T15:42:00.000Z',
+  updatedAt: '2025-05-03T17:05:00.000Z',
+  items: [
+    {
+      id: 'bb22cc33-dd44-55ee-66ff-778899001122',
+      quantity: 1,
+      product: {
+        id: 'c2e5ff3d-3f1b-5a23-9b9c-4b5e6f7a8c9d',
+        image: '7a2d3b9c-6c7d-4e4c-8d3b-2f3d9e4a5f6c.jpg',
+        title: 'Orange Juice',
+        description: 'Freshly squeezed orange juice.',
+        compound: ['vitamin C', 'folate'],
+        price: 28000,
+        type: 'juice',
+        isActive: true,
+      },
+    },
+    {
+      id: 'cc33dd44-ee55-66ff-7788-990011223344',
+      quantity: 3,
+      product: {
+        id: 'd3f6aa4e-4a2c-6b34-acad-5c6f7a8b9c0e',
+        image: '8b3e4cad-7d8e-5f5d-9e4c-3a4ebf5b6c7d.jpg',
+        title: 'Carrot Juice',
+        description: 'Cold-pressed carrot juice with ginger.',
+        compound: ['vitamin A', 'beta-carotene'],
+        price: 27000,
         type: 'juice',
         isActive: true,
       },
@@ -61,20 +98,14 @@ export class OrderController {
 
   @Get()
   @ApiOperation({
-    summary: "List the authenticated user's orders (paginated, newest first)",
+    summary: "List the authenticated user's orders (newest first)",
   })
   @ApiOkResponse({
-    description: 'Paginated orders for the caller',
-    schema: {
-      example: {
-        orders: [orderExample],
-        total: 7,
-        pages: 1,
-      },
-    },
+    description: 'All orders for the caller, newest first',
+    schema: { example: [orderExample, orderExample2] },
   })
   @ApiUnauthorizedResponse({ description: 'Missing or invalid access token' })
-  list(@RequestUser() user: ReqUser, @Query() query: PaginationQuery) {
-    return this.orderService.listForUser(user.id, query.locale, query.page, query.pageSize);
+  list(@RequestUser() user: ReqUser, @Query() query: BasicQuery) {
+    return this.orderService.listForUser(user.id, query.locale);
   }
 }

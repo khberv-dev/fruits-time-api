@@ -79,20 +79,14 @@ export class OrderService {
     });
   }
 
-  async listForUser(userId: string, locale: Locale, page: number, pageSize: number) {
-    const [orders, total] = await this.orderRepo.findAndCount({
+  async listForUser(userId: string, locale: Locale) {
+    const orders = await this.orderRepo.find({
       where: { user: { id: userId } },
       relations: ['items', 'items.product'],
       order: { createdAt: 'DESC' },
-      skip: (page - 1) * pageSize,
-      take: pageSize,
     });
 
-    return {
-      orders: orders.map((order) => this.mapOrder(order, locale)),
-      total,
-      pages: Math.ceil(total / pageSize),
-    };
+    return orders.map((order) => this.mapOrder(order, locale));
   }
 
   private mapOrder(order: Order, locale: Locale) {
