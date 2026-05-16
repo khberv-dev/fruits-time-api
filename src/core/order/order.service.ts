@@ -8,6 +8,11 @@ import { Branch } from '@/shared/entities/branch.entity';
 import { Locale } from '@/shared/enums/locale.enum';
 import { CreateOrderRequest } from '@/core/order/dto/create-order-request.dto';
 import { PosterService } from '@/core/poster/poster.service';
+import { computeUserStatus, getStatusDiscount } from '@/core/user/user.service';
+
+function applyDiscount(price: number, discountPercent: number): number {
+  return Math.round(price * (1 - discountPercent / 100));
+}
 
 @Injectable()
 export class OrderService {
@@ -35,12 +40,22 @@ export class OrderService {
       throw new BadRequestException('Filial topilmadi yoki faol emas');
     }
 
+    const referralCount = await this.userRepo.count({ where: { referredBy: { id: userId } } });
+    const discountPercent = getStatusDiscount(computeUserStatus(referralCount));
+
+    const productById = new Map(products.map((product) => [product.id, product]));
+
     const saved = await this.orderRepo.save({
       user: { id: userId } as User,
-      items: data.items.map((item) => ({
-        product: { id: item.productId } as Product,
-        quantity: item.quantity,
-      })),
+      items: data.items.map((item) => {
+        const lineTotal = productById.get(item.productId)!.price * item.quantity;
+        return {
+          product: { id: item.productId } as Product,
+          quantity: item.quantity,
+          price: applyDiscount(lineTotal, discountPercent),
+          actualPrice: lineTotal,
+        };
+      }),
     });
 
     const order = await this.orderRepo.findOneOrFail({
@@ -48,7 +63,7 @@ export class OrderService {
       relations: ['items', 'items.product'],
     });
 
-    const posOrderId = await this.sendToPoster(userId, products, data, branch.posId);
+    const posOrderId = await this.sendToPoster(userId, products, data, branch.posId, discountPercent);
     if (posOrderId !== null) {
       order.posId = posOrderId;
       await this.orderRepo.save(order);
@@ -62,6 +77,7 @@ export class OrderService {
     products: Product[],
     data: CreateOrderRequest,
     spotId: number,
+    discountPercent: number,
   ): Promise<number | null> {
     const user = await this.userRepo.findOne({ where: { id: userId } });
     if (!user?.posId) {
@@ -70,7 +86,7 @@ export class OrderService {
     }
 
     const productById = new Map(products.map((product) => [product.id, product]));
-    const posterProducts: { id: number; count: number }[] = [];
+    const posterProducts: { id: number; count: number; price?: number }[] = [];
 
     for (const item of data.items) {
       const product = productById.get(item.productId);
@@ -78,7 +94,11 @@ export class OrderService {
         this.logger.warn(`Skipping POS order: product ${item.productId} has no posId`);
         return null;
       }
-      posterProducts.push({ id: product.posId, count: item.quantity });
+      posterProducts.push({
+        id: product.posId,
+        count: item.quantity,
+        price: applyDiscount(product.price, discountPercent),
+      });
     }
 
     return this.posterService.createOrder({
@@ -109,6 +129,8 @@ export class OrderService {
       items: order.items.map((item) => ({
         id: item.id,
         quantity: item.quantity,
+        price: item.price,
+        actualPrice: item.actualPrice,
         product: {
           ...item.product,
           title: item.product.getTitle(locale),

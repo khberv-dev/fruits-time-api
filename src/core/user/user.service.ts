@@ -19,25 +19,41 @@ import { PosterService } from '@/core/poster/poster.service';
 
 dayjs.extend(customParseFormat);
 
+const STATUS_TIERS: { status: UserStatus; minReferrals: number; discountPercent: number }[] = [
+  { status: UserStatus.SILVER, minReferrals: 0, discountPercent: 0 },
+  { status: UserStatus.GOLD, minReferrals: 1, discountPercent: 3 },
+  { status: UserStatus.VIP, minReferrals: 6, discountPercent: 7 },
+  { status: UserStatus.PREMIUM, minReferrals: 11, discountPercent: 12 },
+];
+
 export function computeUserStatus(referralCount: number): UserStatus {
-  if (referralCount > 10) return UserStatus.PREMIUM;
-  if (referralCount > 5) return UserStatus.VIP;
-  if (referralCount >= 1) return UserStatus.GOLD;
-  return UserStatus.SILVER;
+  return getTier(referralCount).status;
+}
+
+export function getStatusDiscount(status: UserStatus): number {
+  return STATUS_TIERS.find((tier) => tier.status === status)?.discountPercent ?? 0;
 }
 
 export function computeStatusProgress(referralCount: number) {
-  const status = computeUserStatus(referralCount);
-  if (status === UserStatus.SILVER) {
-    return { status, nextStatus: UserStatus.GOLD, remaining: 1 - referralCount };
+  const currentIndex = STATUS_TIERS.findIndex((tier) => tier.status === getTier(referralCount).status);
+  const current = STATUS_TIERS[currentIndex];
+  const next = STATUS_TIERS[currentIndex + 1];
+
+  return {
+    status: current.status,
+    discountPercent: current.discountPercent,
+    nextStatus: next?.status ?? null,
+    nextDiscountPercent: next?.discountPercent ?? null,
+    remaining: next ? next.minReferrals - referralCount : 0,
+  };
+}
+
+function getTier(referralCount: number) {
+  let match = STATUS_TIERS[0];
+  for (const tier of STATUS_TIERS) {
+    if (referralCount >= tier.minReferrals) match = tier;
   }
-  if (status === UserStatus.GOLD) {
-    return { status, nextStatus: UserStatus.VIP, remaining: 6 - referralCount };
-  }
-  if (status === UserStatus.VIP) {
-    return { status, nextStatus: UserStatus.PREMIUM, remaining: 11 - referralCount };
-  }
-  return { status, nextStatus: null, remaining: 0 };
+  return match;
 }
 
 @Injectable()
@@ -87,11 +103,13 @@ export class UserService implements OnApplicationBootstrap {
     });
 
     const { password, ...userData } = user;
+    const status = computeUserStatus(referralCount);
 
     return {
       ...userData,
       referralCount,
-      status: computeUserStatus(referralCount),
+      status,
+      discountPercent: getStatusDiscount(status),
     };
   }
 

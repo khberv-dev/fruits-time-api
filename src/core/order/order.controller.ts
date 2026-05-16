@@ -24,6 +24,8 @@ const orderExample = {
     {
       id: 'aa11bb22-cc33-44dd-55ee-66ff77889900',
       quantity: 2,
+      price: 48500,
+      actualPrice: 50000,
       product: {
         id: 'b1d4ee2c-2e9a-4f12-9a8b-3a4d5e6f7a8b',
         image: '6f1c2a8f-5b6e-4d3b-9c2a-1f2c8d3a4e5b.jpg',
@@ -48,6 +50,8 @@ const orderExample2 = {
     {
       id: 'bb22cc33-dd44-55ee-66ff-778899001122',
       quantity: 1,
+      price: 27160,
+      actualPrice: 28000,
       product: {
         id: 'c2e5ff3d-3f1b-5a23-9b9c-4b5e6f7a8c9d',
         image: '7a2d3b9c-6c7d-4e4c-8d3b-2f3d9e4a5f6c.jpg',
@@ -62,6 +66,8 @@ const orderExample2 = {
     {
       id: 'cc33dd44-ee55-66ff-7788-990011223344',
       quantity: 3,
+      price: 78570,
+      actualPrice: 81000,
       product: {
         id: 'd3f6aa4e-4a2c-6b34-acad-5c6f7a8b9c0e',
         image: '8b3e4cad-7d8e-5f5d-9e4c-3a4ebf5b6c7d.jpg',

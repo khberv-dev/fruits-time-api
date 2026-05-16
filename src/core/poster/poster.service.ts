@@ -79,6 +79,7 @@ export class PosterService {
         products: input.products.map((product) => ({
           id: product.id,
           count: product.count,
+          ...(product.price !== undefined ? { price: product.price } : {}),
         })),
       });
 

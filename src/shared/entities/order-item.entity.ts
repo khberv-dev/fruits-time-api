@@ -17,4 +17,10 @@ export class OrderItem {
 
   @Column({ type: 'int' })
   quantity: number;
+
+  @Column({ type: 'int', default: 0 })
+  price: number;
+
+  @Column({ name: 'actual_price', type: 'int', default: 0 })
+  actualPrice: number;
 }

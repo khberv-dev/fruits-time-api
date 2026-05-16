@@ -25,7 +25,8 @@ const userExample = {
   gender: 'male',
   referralCode: 'A2B7K9D',
   referralCount: 4,
-  status: 'silver',
+  status: 'gold',
+  discountPercent: 3,
   role: 'user',
   createdAt: '2025-01-15T08:23:11.512Z',
   updatedAt: '2025-02-02T10:11:00.000Z',
@@ -47,16 +48,27 @@ export class UserController {
 
   @Get('me/referral')
   @ApiOperation({
-    summary: "Get the authenticated user's referral code, invited-user count, and status badge",
+    summary: "Get the authenticated user's referral code, invited-user count, status badge, and discount",
     description:
       'Returns the 7-character referral code (uppercase letters and digits), the number of accounts that registered using it, ' +
-      'the current status badge derived from that count: `silver` (0), `gold` (1–5), `vip` (6–10), `premium` (> 10), ' +
-      'plus the next tier and number of remaining referrals needed to reach it (`nextStatus` is `null` and `remaining` is `0` when already `premium`). ' +
+      'the current status badge derived from that count: `silver` (0, 0% discount), `gold` (1–5, 3%), `vip` (6–10, 7%), `premium` (≥ 11, 12%), ' +
+      'plus the next tier with its discount and number of remaining referrals needed to reach it ' +
+      '(`nextStatus`, `nextDiscountPercent` are `null` and `remaining` is `0` when already `premium`). ' +
       'A code is generated lazily on first call if the account does not have one yet.',
   })
   @ApiOkResponse({
-    description: 'Referral code, invited-user count, and status badge',
-    schema: { example: { code: 'A2B7K9D', count: 4, status: 'gold', nextStatus: 'vip', remaining: 2 } },
+    description: 'Referral code, invited-user count, status badge, and discount tiers',
+    schema: {
+      example: {
+        code: 'A2B7K9D',
+        count: 4,
+        status: 'gold',
+        discountPercent: 3,
+        nextStatus: 'vip',
+        nextDiscountPercent: 7,
+        remaining: 2,
+      },
+    },
   })
   @ApiUnauthorizedResponse({ description: 'Missing or invalid access token' })
   getReferral(@RequestUser() user: ReqUser) {
