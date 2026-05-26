@@ -15,6 +15,7 @@ import { StatsModule } from '@/core/stats/stats.module';
 import { AssistantModule } from '@/core/assistant/assistant.module';
 import { BannerModule } from '@/core/banner/banner.module';
 import { OrderModule } from '@/core/order/order.module';
+import { AddressModule } from '@/core/address/address.module';
 import { BranchModule } from '@/core/branch/branch.module';
 import { ScheduleModule } from '@nestjs/schedule';
 
@@ -38,6 +39,7 @@ import { ScheduleModule } from '@nestjs/schedule';
     ProductModule,
     BannerModule,
     OrderModule,
+    AddressModule,
     BranchModule,
     StatsModule,
     AssistantModule,

@@ -1,14 +1,4 @@
-import {
-  ArrayMinSize,
-  IsArray,
-  IsEnum,
-  IsInt,
-  IsNumber,
-  IsOptional,
-  IsUUID,
-  Min,
-  ValidateNested,
-} from 'class-validator';
+import { ArrayMinSize, IsArray, IsEnum, IsInt, IsOptional, IsUUID, Min, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { OrderType } from '@/shared/enums/order-type.enum';
@@ -24,16 +14,6 @@ export class CreateOrderItem {
   quantity: number;
 }
 
-export class CreateOrderAddress {
-  @ApiProperty({ example: 69.2401, description: 'Longitude' })
-  @IsNumber()
-  long: number;
-
-  @ApiProperty({ example: 41.2995, description: 'Latitude' })
-  @IsNumber()
-  lat: number;
-}
-
 export class CreateOrderRequest {
   @ApiProperty({ example: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', description: 'Branch UUID' })
   @IsUUID()
@@ -44,13 +24,13 @@ export class CreateOrderRequest {
   type: OrderType;
 
   @ApiPropertyOptional({
-    type: CreateOrderAddress,
-    description: 'Delivery coordinates. Omit for pickup orders.',
+    example: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+    description:
+      "UUID of one of the caller's saved addresses. Its coordinates are snapshotted onto the order. Omit for pickup orders.",
   })
   @IsOptional()
-  @ValidateNested()
-  @Type(() => CreateOrderAddress)
-  address?: CreateOrderAddress;
+  @IsUUID()
+  addressId?: string;
 
   @ApiProperty({
     type: [CreateOrderItem],

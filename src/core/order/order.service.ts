@@ -5,6 +5,8 @@ import { Order } from '@/shared/entities/order.entity';
 import { Product } from '@/shared/entities/product.entity';
 import { User } from '@/shared/entities/user.entity';
 import { Branch } from '@/shared/entities/branch.entity';
+import { Address } from '@/shared/entities/address.entity';
+import { Coordinates } from '@/shared/types/coordinates.type';
 import { Locale } from '@/shared/enums/locale.enum';
 import { CreateOrderRequest } from '@/core/order/dto/create-order-request.dto';
 import { PosterService } from '@/core/poster/poster.service';
@@ -23,6 +25,7 @@ export class OrderService {
     @InjectRepository(Product) private readonly productRepo: Repository<Product>,
     @InjectRepository(User) private readonly userRepo: Repository<User>,
     @InjectRepository(Branch) private readonly branchRepo: Repository<Branch>,
+    @InjectRepository(Address) private readonly addressRepo: Repository<Address>,
     private readonly posterService: PosterService,
   ) {}
 
@@ -40,6 +43,17 @@ export class OrderService {
       throw new BadRequestException('Filial topilmadi yoki faol emas');
     }
 
+    let address: Coordinates | null = null;
+    if (data.addressId) {
+      const savedAddress = await this.addressRepo.findOne({
+        where: { id: data.addressId, user: { id: userId } },
+      });
+      if (!savedAddress) {
+        throw new BadRequestException('Manzil topilmadi');
+      }
+      address = { long: savedAddress.long, lat: savedAddress.lat };
+    }
+
     const referralCount = await this.userRepo.count({ where: { referredBy: { id: userId } } });
     const discountPercent = getStatusDiscount(computeUserStatus(referralCount));
 
@@ -48,7 +62,7 @@ export class OrderService {
     const saved = await this.orderRepo.save({
       user: { id: userId } as User,
       type: data.type,
-      address: data.address ?? null,
+      address,
       items: data.items.map((item) => {
         const lineTotal = productById.get(item.productId)!.price * item.quantity;
         return {

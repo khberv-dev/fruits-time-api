@@ -10,6 +10,7 @@ import {
 } from 'typeorm';
 import { UserRole } from '@/shared/enums/user-role.enum';
 import { Order } from '@/shared/entities/order.entity';
+import { Address } from '@/shared/entities/address.entity';
 import { Gender } from '@/shared/enums/gender.enum';
 
 @Entity('users')
@@ -47,6 +48,9 @@ export class User {
 
   @OneToMany(() => Order, (order) => order.user)
   orders: Order[];
+
+  @OneToMany(() => Address, (address) => address.user)
+  addresses: Address[];
 
   @Column({ name: 'pos_id', type: 'int', nullable: true })
   posId: number | null;

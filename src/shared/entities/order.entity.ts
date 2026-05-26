@@ -12,7 +12,7 @@ import { User } from '@/shared/entities/user.entity';
 import { OrderItem } from '@/shared/entities/order-item.entity';
 import { OrderStatus } from '@/shared/enums/order-status.enum';
 import { OrderType } from '@/shared/enums/order-type.enum';
-import { Address } from '@/shared/types/address.type';
+import { Coordinates } from '@/shared/types/coordinates.type';
 
 @Entity('orders')
 export class Order {
@@ -30,7 +30,7 @@ export class Order {
   type: OrderType;
 
   @Column({ type: 'jsonb', nullable: true })
-  address: Address | null;
+  address: Coordinates | null;
 
   @Column({ name: 'pos_id', type: 'int', nullable: true })
   posId: number | null;
