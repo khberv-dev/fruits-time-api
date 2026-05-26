@@ -11,6 +11,8 @@ import {
 import { User } from '@/shared/entities/user.entity';
 import { OrderItem } from '@/shared/entities/order-item.entity';
 import { OrderStatus } from '@/shared/enums/order-status.enum';
+import { OrderType } from '@/shared/enums/order-type.enum';
+import { Address } from '@/shared/types/address.type';
 
 @Entity('orders')
 export class Order {
@@ -23,6 +25,12 @@ export class Order {
 
   @Column({ type: 'enum', enum: OrderStatus, default: OrderStatus.CREATED })
   status: OrderStatus;
+
+  @Column({ type: 'enum', enum: OrderType, default: OrderType.PICKUP })
+  type: OrderType;
+
+  @Column({ type: 'jsonb', nullable: true })
+  address: Address | null;
 
   @Column({ name: 'pos_id', type: 'int', nullable: true })
   posId: number | null;

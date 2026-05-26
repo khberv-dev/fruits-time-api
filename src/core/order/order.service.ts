@@ -47,6 +47,8 @@ export class OrderService {
 
     const saved = await this.orderRepo.save({
       user: { id: userId } as User,
+      type: data.type,
+      address: data.address ?? null,
       items: data.items.map((item) => {
         const lineTotal = productById.get(item.productId)!.price * item.quantity;
         return {
@@ -124,6 +126,8 @@ export class OrderService {
       id: order.id,
       posId: order.posId,
       status: order.status,
+      type: order.type,
+      address: order.address,
       createdAt: order.createdAt,
       updatedAt: order.updatedAt,
       items: order.items.map((item) => ({

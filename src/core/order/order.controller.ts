@@ -18,6 +18,8 @@ const orderExample = {
   id: '7e9f2d3b-1234-4abc-9d8e-2c4f6a1b3c5d',
   posId: 45,
   status: 'created',
+  type: 'delivery',
+  address: { long: 69.2401, lat: 41.2995 },
   createdAt: '2025-05-04T10:15:00.000Z',
   updatedAt: '2025-05-04T10:15:00.000Z',
   items: [
@@ -44,6 +46,8 @@ const orderExample2 = {
   id: '0c2a1e8b-9d33-4f56-87ab-12cd34ef56ab',
   posId: 46,
   status: 'delivered',
+  type: 'pickup',
+  address: null,
   createdAt: '2025-05-03T15:42:00.000Z',
   updatedAt: '2025-05-03T17:05:00.000Z',
   items: [
