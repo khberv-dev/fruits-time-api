@@ -12,6 +12,10 @@ export interface DeliveryOrderItem {
   name: string;
   price_per_unit: number;
   quantity: number;
+  width: number;
+  height: number;
+  length: number;
+  weight: number;
 }
 
 export interface DeliveryCreateOrderInput {

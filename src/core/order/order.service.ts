@@ -142,6 +142,10 @@ export class OrderService {
         name: item.product.getTitle(locale),
         price_per_unit: Math.round(item.price / item.quantity),
         quantity: item.quantity,
+        width: 10,
+        height: 10,
+        length: 10,
+        weight: 10,
       })),
       origin: {
         location: { long: branch.long, lat: branch.lat },
