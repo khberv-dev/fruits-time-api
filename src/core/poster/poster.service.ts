@@ -25,6 +25,20 @@ export class PosterService {
       httpAgent,
       httpsAgent,
     });
+
+    this.apiClient.interceptors.request.use((config) => {
+      this.logger.log(
+        `→ ${config.method?.toUpperCase()} ${config.url ?? ''} body=${JSON.stringify(config.data ?? null)}`,
+      );
+      return config;
+    });
+
+    this.apiClient.interceptors.response.use((response) => {
+      this.logger.log(
+        `← ${response.status} ${response.config.url ?? ''} body=${JSON.stringify(response.data ?? null)}`,
+      );
+      return response;
+    });
   }
 
   async getSpots(): Promise<PosterSpot[]> {
