@@ -10,6 +10,8 @@ import { Coordinates } from '@/shared/types/coordinates.type';
 import { Locale } from '@/shared/enums/locale.enum';
 import { CreateOrderRequest } from '@/core/order/dto/create-order-request.dto';
 import { PosterService } from '@/core/poster/poster.service';
+import { DeliveryService } from '@/core/delivery/delivery.service';
+import { OrderType } from '@/shared/enums/order-type.enum';
 import { computeUserStatus, getStatusDiscount } from '@/core/user/user.service';
 
 function applyDiscount(price: number, discountPercent: number): number {
@@ -27,6 +29,7 @@ export class OrderService {
     @InjectRepository(Branch) private readonly branchRepo: Repository<Branch>,
     @InjectRepository(Address) private readonly addressRepo: Repository<Address>,
     private readonly posterService: PosterService,
+    private readonly deliveryService: DeliveryService,
   ) {}
 
   async create(userId: string, locale: Locale, data: CreateOrderRequest) {
@@ -43,16 +46,19 @@ export class OrderService {
       throw new BadRequestException('Filial topilmadi yoki faol emas');
     }
 
-    let address: Coordinates | null = null;
+    let savedAddress: Address | null = null;
     if (data.addressId) {
-      const savedAddress = await this.addressRepo.findOne({
+      savedAddress = await this.addressRepo.findOne({
         where: { id: data.addressId, user: { id: userId } },
       });
       if (!savedAddress) {
         throw new BadRequestException('Manzil topilmadi');
       }
-      address = { long: savedAddress.long, lat: savedAddress.lat };
     }
+
+    const addressSnapshot: Coordinates | null = savedAddress
+      ? { long: savedAddress.long, lat: savedAddress.lat }
+      : null;
 
     const referralCount = await this.userRepo.count({ where: { referredBy: { id: userId } } });
     const discountPercent = getStatusDiscount(computeUserStatus(referralCount));
@@ -62,7 +68,7 @@ export class OrderService {
     const saved = await this.orderRepo.save({
       user: { id: userId } as User,
       type: data.type,
-      address,
+      address: addressSnapshot,
       items: data.items.map((item) => {
         const lineTotal = productById.get(item.productId)!.price * item.quantity;
         return {
@@ -85,7 +91,50 @@ export class OrderService {
       await this.orderRepo.save(order);
     }
 
+    if (data.type === OrderType.DELIVERY) {
+      await this.sendToDelivery(order, branch, savedAddress, userId);
+    }
+
     return this.mapOrder(order, locale);
+  }
+
+  private async sendToDelivery(order: Order, branch: Branch, address: Address | null, userId: string): Promise<void> {
+    if (!address) {
+      this.logger.warn(`Skipping delivery: order ${order.id} has no addressId`);
+      return;
+    }
+
+    if (branch.long === null || branch.lat === null) {
+      this.logger.warn(`Skipping delivery: branch ${branch.id} has no coordinates`);
+      return;
+    }
+
+    if (!branch.address) {
+      this.logger.warn(`Skipping delivery: branch ${branch.id} has no address`);
+      return;
+    }
+
+    const user = await this.userRepo.findOne({ where: { id: userId } });
+    if (!user) {
+      this.logger.warn(`Skipping delivery: user ${userId} not found`);
+      return;
+    }
+
+    await this.deliveryService.createOrder({
+      vendorOrderId: order.id,
+      origin: {
+        location: { long: branch.long, lat: branch.lat },
+        address: branch.address,
+        client: {
+          phone: user.phoneNumber.startsWith('+') ? user.phoneNumber : `+${user.phoneNumber}`,
+          name: user.firstName,
+        },
+      },
+      destination: {
+        location: { long: address.long, lat: address.lat },
+        address: address.name,
+      },
+    });
   }
 
   private async sendToPoster(

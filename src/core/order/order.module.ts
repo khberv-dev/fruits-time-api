@@ -9,9 +9,10 @@ import { User } from '@/shared/entities/user.entity';
 import { Branch } from '@/shared/entities/branch.entity';
 import { Address } from '@/shared/entities/address.entity';
 import { PosterModule } from '@/core/poster/poster.module';
+import { DeliveryModule } from '@/core/delivery/delivery.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Order, OrderItem, Product, User, Branch, Address]), PosterModule],
+  imports: [TypeOrmModule.forFeature([Order, OrderItem, Product, User, Branch, Address]), PosterModule, DeliveryModule],
   controllers: [OrderController],
   providers: [OrderService],
 })

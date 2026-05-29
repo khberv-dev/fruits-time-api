@@ -1,9 +1,10 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { Branch } from '@/shared/entities/branch.entity';
 import { PosterService } from '@/core/poster/poster.service';
+import { UpdateBranchRequest } from '@/core/branch/dto/update-branch-request.dto';
 
 @Injectable()
 export class BranchService {
@@ -36,5 +37,17 @@ export class BranchService {
 
   list(): Promise<Branch[]> {
     return this.branchRepo.find({ where: { isActive: true }, order: { posId: 'ASC' } });
+  }
+
+  async update(id: string, data: UpdateBranchRequest): Promise<Branch> {
+    const branch = await this.branchRepo.findOne({ where: { id } });
+    if (!branch) {
+      throw new NotFoundException('Filial topilmadi');
+    }
+
+    if (data.long !== undefined) branch.long = data.long;
+    if (data.lat !== undefined) branch.lat = data.lat;
+
+    return this.branchRepo.save(branch);
   }
 }

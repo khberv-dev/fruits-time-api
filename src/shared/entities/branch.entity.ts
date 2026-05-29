@@ -14,6 +14,12 @@ export class Branch {
   @Column()
   address: string;
 
+  @Column({ type: 'double precision', nullable: true })
+  long: number | null;
+
+  @Column({ type: 'double precision', nullable: true })
+  lat: number | null;
+
   @Column({ name: 'is_active', default: true })
   isActive: boolean;
 
