@@ -40,6 +40,14 @@ export class DeliveryService {
           address: input.destination.address,
         },
         payment_type: 'BALANCE',
+        delivery: {
+          type: 'EXPRESS',
+          time: null,
+          send_link: true,
+          door_to_door: false,
+          product_paid: true,
+          equipment_id: 1,
+        },
       });
       return true;
     } catch (error) {

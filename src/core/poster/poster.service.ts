@@ -81,6 +81,7 @@ export class PosterService {
           count: product.count,
           ...(product.price !== undefined ? { price: product.price } : {}),
         })),
+        ...(input.delivery !== undefined ? { delivery: input.delivery } : {}),
       });
 
       if (data.error !== undefined && data.error !== 0) {

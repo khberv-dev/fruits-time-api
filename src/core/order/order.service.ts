@@ -18,6 +18,8 @@ function applyDiscount(price: number, discountPercent: number): number {
   return Math.round(price * (1 - discountPercent / 100));
 }
 
+const POSTER_DELIVERY = { courierId: 0, deliveryPrice: 15000, processingStatus: 0 };
+
 @Injectable()
 export class OrderService {
   private readonly logger = new Logger('Order Service');
@@ -171,6 +173,7 @@ export class OrderService {
       autoAccept: false,
       client: { id: user.posId },
       products: posterProducts,
+      ...(data.type === OrderType.DELIVERY ? { delivery: POSTER_DELIVERY } : {}),
     });
   }
 
