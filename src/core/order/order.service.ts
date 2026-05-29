@@ -18,7 +18,7 @@ function applyDiscount(price: number, discountPercent: number): number {
   return Math.round(price * (1 - discountPercent / 100));
 }
 
-const POSTER_DELIVERY = { courierId: 0, deliveryPrice: 15000, processingStatus: 0 };
+const POSTER_DELIVERY = { courierId: 1, deliveryPrice: 15000, processingStatus: 30 };
 
 @Injectable()
 export class OrderService {
