@@ -62,6 +62,11 @@ export class DeliveryService {
           apartment: '0',
           location: input.destination.location,
           address: input.destination.address,
+          products: {
+            type_id: 2,
+            description: 'Sharbat',
+            items: input.items,
+          },
         },
         payment_type: 'BALANCE',
         delivery: {

@@ -8,8 +8,15 @@ export interface DeliveryLocation {
   lat: number;
 }
 
+export interface DeliveryOrderItem {
+  name: string;
+  price_per_unit: number;
+  quantity: number;
+}
+
 export interface DeliveryCreateOrderInput {
   vendorOrderId: string;
+  items: DeliveryOrderItem[];
   origin: {
     location: DeliveryLocation;
     address: string;
