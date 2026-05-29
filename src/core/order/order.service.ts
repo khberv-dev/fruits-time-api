@@ -123,7 +123,7 @@ export class OrderService {
 
     if (branch.long === null || branch.lat === null) {
       this.logger.error(`Delivery rejected: branch ${branch.id} has no coordinates`);
-      throw new InternalServerErrorException("Filial koordinatalari sozlanmagan");
+      throw new InternalServerErrorException('Filial koordinatalari sozlanmagan');
     }
 
     if (!branch.address) {
@@ -172,7 +172,7 @@ export class OrderService {
     const user = await this.userRepo.findOne({ where: { id: userId } });
     if (!user?.posId) {
       this.logger.error(`POS order rejected: user ${userId} has no posId`);
-      throw new InternalServerErrorException("POS klienti sozlanmagan");
+      throw new InternalServerErrorException('POS klienti sozlanmagan');
     }
 
     const productById = new Map(products.map((product) => [product.id, product]));
