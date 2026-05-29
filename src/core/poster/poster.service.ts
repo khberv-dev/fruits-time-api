@@ -89,6 +89,7 @@ export class PosterService {
       const { data } = await this.apiClient.post<PosterResponse<PosterOrderResponse>>('/orders', {
         spotId: input.spotId,
         autoAccept: input.autoAccept,
+        serviceMode: input.serviceMode,
         client: { id: input.client.id },
         products: input.products.map((product) => ({
           id: product.id,

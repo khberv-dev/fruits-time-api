@@ -171,6 +171,7 @@ export class OrderService {
     return this.posterService.createOrder({
       spotId,
       autoAccept: false,
+      serviceMode: data.type === OrderType.DELIVERY ? 3 : 2,
       client: { id: user.posId },
       products: posterProducts,
       ...(data.type === OrderType.DELIVERY ? { delivery: POSTER_DELIVERY } : {}),
