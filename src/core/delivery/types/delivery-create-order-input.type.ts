@@ -1,6 +1,7 @@
 export interface DeliveryClient {
   phone: string;
   name: string;
+  email?: string;
 }
 
 export interface DeliveryLocation {
@@ -29,5 +30,6 @@ export interface DeliveryCreateOrderInput {
   destination: {
     location: DeliveryLocation;
     address: string;
+    client: DeliveryClient;
   };
 }

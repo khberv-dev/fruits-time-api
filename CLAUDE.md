@@ -25,6 +25,9 @@ Path alias: `@/*` → `src/*` (see `tsconfig.json`). Use this in imports rather 
 - `JWT_ACCESS_SECRET` / `JWT_ACCESS_EXPIRE` / `JWT_REFRESH_SECRET` / `JWT_REFRESH_EXPIRE`.
 - `GENAI_KEY` / `GENAI_MODEL` — Google GenAI (`@google/genai`) used by the assistant.
 - `ESKIZ_SMS_*` — Eskiz SMS gateway used to deliver OTPs.
+- `POSTER_API_URL` / `POSTER_API_KEY` — Poster POS integration (branch sync, order creation, client creation).
+- `DELIVERY_API_URL` / `DELIVERY_API_KEY` — Noor delivery service integration.
+- `PORT` — HTTP port (default `8000`).
 
 ## Architecture
 
@@ -32,7 +35,7 @@ NestJS 11 + TypeORM (Postgres) + Passport JWT. `src/main.ts` boots the app with 
 
 ### Module layout
 
-- `src/core/*` — feature modules: `auth`, `user`, `catalog`, `product`, `banner`, `stats`, `assistant`, `notify`. Each is a self-contained NestJS module with controller/service/dto.
+- `src/core/*` — feature modules: `auth`, `user`, `catalog`, `product`, `banner`, `order`, `address`, `branch`, `stats`, `assistant`, `notify`, `poster`, `delivery`. Each is a self-contained NestJS module with controller/service/dto.
 - `src/shared/` — cross-cutting code: TypeORM `entities/`, `enums/`, `dto/` (query/pagination/search), `types/`, `utils/lib.ts` (bcrypt + OTP helpers), and `config/database.config.ts` (the single TypeORM `DataSource`).
 - `src/common/` — framework wiring: `guards/` (JWT access/refresh, role), `decorators/` (`@IsPublic`, `@Role`, `@RequestUser`), `pipes/`, and `interceptors/upload-file.interceptor.ts` (multer disk storage at `uploads/<entity>/<uuid><ext>`).
 
@@ -58,6 +61,23 @@ Three locales (`uz`, `ru`, `en` — `src/shared/enums/locale.enum.ts`). Translat
 ### File uploads
 
 `uploadFileInterceptor('<entity>')` writes to `uploads/<entity>/`. Files are served back at `/public/*` via `ServeStaticModule` (configured in `AppModule` with `fallthrough: false`).
+
+### Poster POS integration
+
+`PosterService` wraps the Poster POS REST API (token passed as a query param). `BranchService` runs a `@Cron(EVERY_10_MINUTES)` that calls `getSpots()` and upserts branches by `posId`. Before orders can be placed, both the `User` and each `Product` must have a `posId` set (linking them to Poster clients/products). `PosterService.createClient` is called from `UserService` at registration time to register the user in Poster.
+
+### Order creation flow
+
+`OrderService.create` runs inside a single TypeORM transaction:
+1. Saves the `Order` + `OrderItem` rows with `applyDiscount` applied (discount driven by user referral tier).
+2. Calls `PosterService.createOrder` to push the order to the POS; stores the returned `posId` on the order.
+3. If `type === DELIVERY`, calls `DeliveryService.createOrder` (noor.uz API).
+
+Any external API failure throws an `InternalServerErrorException` and rolls back the transaction. Both external service methods return `null` on failure; callers check for null and throw rather than propagating the raw error.
+
+### User referral / status tiers
+
+`STATUS_TIERS` in `user.service.ts` maps referral count → `UserStatus` (SILVER / GOLD / VIP / PREMIUM) and discount percentage (0 / 3 / 7 / 12 %). `computeUserStatus` and `getStatusDiscount` are exported and consumed by `OrderService` to price order items.
 
 ### Assistant module
 

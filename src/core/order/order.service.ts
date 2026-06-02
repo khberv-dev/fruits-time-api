@@ -158,6 +158,10 @@ export class OrderService {
       destination: {
         location: { long: address.long, lat: address.lat },
         address: address.name,
+        client: {
+          phone: user.phoneNumber.startsWith('+') ? user.phoneNumber : `+${user.phoneNumber}`,
+          name: user.firstName,
+        },
       },
     });
 

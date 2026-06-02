@@ -44,30 +44,36 @@ export class DeliveryService {
     try {
       await this.apiClient.post('/orders', {
         vendor_order_id: input.vendorOrderId,
-        origin: {
-          order: 1,
-          entrance: '0',
-          door_phone: '0',
-          floor: 0,
-          apartment: '0',
-          location: input.origin.location,
-          address: input.origin.address,
-          client: input.origin.client,
-        },
-        destination: {
-          order: 2,
-          entrance: '0',
-          door_phone: '0',
-          floor: 0,
-          apartment: '0',
-          location: input.destination.location,
-          address: input.destination.address,
-          products: {
-            type_id: 2,
-            description: 'Sharbat',
-            items: input.items,
+        origin: [
+          {
+            order: 1,
+            entrance: '0',
+            door_phone: '0',
+            floor: 0,
+            apartment: '0',
+            location: input.origin.location,
+            address: input.origin.address,
+            client: input.origin.client,
           },
-        },
+        ],
+        destination: [
+          {
+            order: 2,
+            entrance: '0',
+            door_phone: '0',
+            floor: 0,
+            apartment: '0',
+            location: input.destination.location,
+            address: input.destination.address,
+            client: input.destination.client,
+            comment: '',
+            products: {
+              type_id: 2,
+              description: 'Sharbat',
+              items: input.items,
+            },
+          },
+        ],
         payment_type: 'BALANCE',
         delivery: {
           type: 'EXPRESS',
