@@ -1,7 +1,8 @@
 import { IsUUID } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
+import { BasicQuery } from '@/shared/dto/basic-query.dto';
 
-export class DeliveryCostQuery {
+export class DeliveryCostQuery extends BasicQuery {
   @ApiProperty({ example: 'b1d4ee2c-2e9a-4f12-9a8b-3a4d5e6f7a8b', description: 'Branch (origin) ID' })
   @IsUUID()
   branchId: string;
