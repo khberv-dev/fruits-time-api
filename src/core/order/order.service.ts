@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { Cron, CronExpression } from '@nestjs/schedule';
+import { In, LessThan, Repository } from 'typeorm';
 import { Order } from '@/shared/entities/order.entity';
 import { Product } from '@/shared/entities/product.entity';
 import { User } from '@/shared/entities/user.entity';
@@ -12,6 +13,7 @@ import { CreateOrderRequest } from '@/core/order/dto/create-order-request.dto';
 import { PosterService } from '@/core/poster/poster.service';
 import { DeliveryService } from '@/core/delivery/delivery.service';
 import { OrderType } from '@/shared/enums/order-type.enum';
+import { OrderStatus } from '@/shared/enums/order-status.enum';
 import { computeUserStatus, getStatusDiscount } from '@/core/user/user.service';
 
 function applyDiscount(price: number, discountPercent: number): number {
@@ -33,6 +35,18 @@ export class OrderService {
     private readonly posterService: PosterService,
     private readonly deliveryService: DeliveryService,
   ) {}
+
+  @Cron(CronExpression.EVERY_5_MINUTES)
+  async cancelStaleOrders(): Promise<void> {
+    const cutoff = new Date(Date.now() - 2 * 60 * 60 * 1000);
+    const { affected } = await this.orderRepo.update(
+      { status: OrderStatus.CREATED, createdAt: LessThan(cutoff) },
+      { status: OrderStatus.CANCELLED },
+    );
+    if (affected) {
+      this.logger.log(`cancelStaleOrders: cancelled ${affected} orders older than 2 hours`);
+    }
+  }
 
   async create(userId: string, locale: Locale, data: CreateOrderRequest) {
     const productIds = [...new Set(data.items.map((item) => item.productId))];
