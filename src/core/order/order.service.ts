@@ -15,12 +15,13 @@ import { DeliveryService } from '@/core/delivery/delivery.service';
 import { OrderType } from '@/shared/enums/order-type.enum';
 import { OrderStatus } from '@/shared/enums/order-status.enum';
 import { computeUserStatus, getStatusDiscount } from '@/core/user/user.service';
+import { calculateDeliveryCost } from '@/shared/utils/lib';
 
 function applyDiscount(price: number, discountPercent: number): number {
   return Math.round(price * (1 - discountPercent / 100));
 }
 
-const POSTER_DELIVERY = { courierId: 1, deliveryPrice: 15000, processingStatus: 40 };
+const POSTER_DELIVERY_BASE = { courierId: 1, processingStatus: 40 };
 
 @Injectable()
 export class OrderService {
@@ -46,6 +47,17 @@ export class OrderService {
     if (affected) {
       this.logger.log(`cancelStaleOrders: cancelled ${affected} orders older than 2 hours`);
     }
+  }
+
+  async getDeliveryCost(userId: string, branchId: string, addressId: string): Promise<{ cost: number }> {
+    const branch = await this.branchRepo.findOne({ where: { id: branchId, isActive: true } });
+    if (!branch) throw new BadRequestException('Filial topilmadi yoki faol emas');
+    if (branch.lat === null || branch.long === null) throw new BadRequestException('Filial koordinatalari sozlanmagan');
+
+    const address = await this.addressRepo.findOne({ where: { id: addressId, user: { id: userId } } });
+    if (!address) throw new BadRequestException('Manzil topilmadi');
+
+    return { cost: calculateDeliveryCost(branch.lat, branch.long, address.lat, address.long) };
   }
 
   async create(userId: string, locale: Locale, data: CreateOrderRequest) {
@@ -110,7 +122,12 @@ export class OrderService {
         relations: ['items', 'items.product'],
       });
 
-      order.posId = await this.sendToPoster(userId, products, data, branch.posId, discountPercent);
+      const deliveryCost =
+        data.type === OrderType.DELIVERY && branch.lat !== null && branch.long !== null && savedAddress
+          ? calculateDeliveryCost(branch.lat, branch.long, savedAddress.lat, savedAddress.long)
+          : undefined;
+
+      order.posId = await this.sendToPoster(userId, products, data, branch.posId, discountPercent, deliveryCost);
       await orderRepo.save(order);
 
       if (data.type === OrderType.DELIVERY) {
@@ -190,6 +207,7 @@ export class OrderService {
     data: CreateOrderRequest,
     spotId: number,
     discountPercent: number,
+    deliveryCost?: number,
   ): Promise<number> {
     const user = await this.userRepo.findOne({ where: { id: userId } });
     if (!user?.posId) {
@@ -219,7 +237,9 @@ export class OrderService {
       serviceMode: data.type === OrderType.DELIVERY ? 3 : 2,
       client: { id: user.posId },
       products: posterProducts,
-      ...(data.type === OrderType.DELIVERY ? { delivery: POSTER_DELIVERY } : {}),
+      ...(data.type === OrderType.DELIVERY
+        ? { delivery: { ...POSTER_DELIVERY_BASE, deliveryPrice: deliveryCost ?? 15_000 } }
+        : {}),
     });
 
     if (posOrderId === null) {

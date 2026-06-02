@@ -12,6 +12,7 @@ import { OrderService } from '@/core/order/order.service';
 import { RequestUser } from '@/common/decorators/request-user.decorator';
 import type { ReqUser } from '@/shared/types/req-user.type';
 import { CreateOrderRequest } from '@/core/order/dto/create-order-request.dto';
+import { DeliveryCostQuery } from '@/core/order/dto/delivery-cost-query.dto';
 import { BasicQuery } from '@/shared/dto/basic-query.dto';
 
 const orderExample = {
@@ -104,6 +105,15 @@ export class OrderController {
   @ApiUnauthorizedResponse({ description: 'Missing or invalid access token' })
   create(@RequestUser() user: ReqUser, @Query() query: BasicQuery, @Body() body: CreateOrderRequest) {
     return this.orderService.create(user.id, query.locale, body);
+  }
+
+  @Get('delivery-cost')
+  @ApiOperation({ summary: 'Calculate delivery cost from a branch to a saved address' })
+  @ApiOkResponse({ description: 'Delivery cost in UZS', schema: { example: { cost: 27500 } } })
+  @ApiBadRequestResponse({ description: 'Branch or address not found / branch has no coordinates' })
+  @ApiUnauthorizedResponse({ description: 'Missing or invalid access token' })
+  getDeliveryCost(@RequestUser() user: ReqUser, @Query() query: DeliveryCostQuery) {
+    return this.orderService.getDeliveryCost(user.id, query.branchId, query.addressId);
   }
 
   @Get()
