@@ -133,6 +133,28 @@ export class PosterService {
     }
   }
 
+  async getStorageLeftovers(storageId: number): Promise<Map<number, boolean>> {
+    try {
+      const { data } = await this.apiClient.get<
+        PosterResponse<{ ingredient_id: string; storage_ingredient_left: string }[]>
+      >('/storage.getStorageLeftovers', { params: { storage_id: storageId } });
+
+      if (data.error !== undefined && data.error !== 0) {
+        this.logger.error(`getStorageLeftovers failed for storage ${storageId}: [${JSON.stringify(data.error)}]`);
+        return new Map();
+      }
+
+      const map = new Map<number, boolean>();
+      for (const item of data.response ?? []) {
+        map.set(Number(item.ingredient_id), parseFloat(item.storage_ingredient_left) > 0);
+      }
+      return map;
+    } catch (error) {
+      this.logger.error(`getStorageLeftovers failed for storage ${storageId}: ${this.formatError(error)}`);
+      return new Map();
+    }
+  }
+
   async getProduct(productId: number): Promise<number[] | null> {
     try {
       const { data } = await this.apiClient.get<

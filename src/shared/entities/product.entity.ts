@@ -8,6 +8,7 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { Localized } from '@/shared/types/localized.type';
+import { ProductAvailability } from '@/shared/types/product-availability.type';
 import { Catalog } from '@/shared/entities/catalog.entity';
 import { Locale } from '@/shared/enums/locale.enum';
 import { getObjectDefaultValue } from '@/shared/utils/lib';
@@ -45,6 +46,9 @@ export class Product {
 
   @Column({ type: 'int', array: true, nullable: true, default: null })
   ingredients: number[] | null;
+
+  @Column({ type: 'jsonb', nullable: true, default: null })
+  available: ProductAvailability[] | null;
 
   @Column({ name: 'is_active', default: true })
   isActive: boolean;

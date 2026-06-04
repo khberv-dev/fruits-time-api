@@ -2,12 +2,14 @@ import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { Product } from '@/shared/entities/product.entity';
+import { Branch } from '@/shared/entities/branch.entity';
 import { Not, IsNull, Repository } from 'typeorm';
 import { Locale } from '@/shared/enums/locale.enum';
 import { CreateProductRequest } from '@/core/product/dto/create-product-request.dto';
 import { UpdateProductRequest } from '@/core/product/dto/update-product-request.dto';
 import { PosterService } from '@/core/poster/poster.service';
 import { ProductType } from '@/shared/enums/product-type.enum';
+import { ProductAvailability } from '@/shared/types/product-availability.type';
 
 @Injectable()
 export class ProductService {
@@ -15,8 +17,46 @@ export class ProductService {
 
   constructor(
     @InjectRepository(Product) private readonly productRepo: Repository<Product>,
+    @InjectRepository(Branch) private readonly branchRepo: Repository<Branch>,
     private readonly posterService: PosterService,
   ) {}
+
+  @Cron(CronExpression.EVERY_10_MINUTES)
+  async syncAvailability(): Promise<void> {
+    const branches = await this.branchRepo.find({ where: { storageId: Not(IsNull()), isActive: true } });
+    if (!branches.length) return;
+
+    const leftoversPerStorage = new Map<number, Map<number, boolean>>();
+    for (const branch of branches) {
+      leftoversPerStorage.set(branch.storageId!, await this.posterService.getStorageLeftovers(branch.storageId!));
+    }
+
+    const products = await this.productRepo.find({ where: { isActive: true } });
+
+    let updated = 0;
+    for (const product of products) {
+      const available: ProductAvailability[] = branches.map((branch) => {
+        const leftovers = leftoversPerStorage.get(branch.storageId!)!;
+        let left = false;
+
+        if (product.type === ProductType.JUICE) {
+          left =
+            product.ingredients !== null &&
+            product.ingredients.length > 0 &&
+            product.ingredients.every((id) => leftovers.get(id) === true);
+        } else if (product.type === ProductType.VITAMIN) {
+          left = product.posId !== null && leftovers.get(product.posId) === true;
+        }
+
+        return { storage_id: branch.storageId!, left };
+      });
+
+      await this.productRepo.update(product.id, { available });
+      updated++;
+    }
+
+    this.logger.log(`syncAvailability: updated ${updated} products across ${branches.length} storages`);
+  }
 
   @Cron(CronExpression.EVERY_5_MINUTES)
   async syncIngredients(): Promise<void> {

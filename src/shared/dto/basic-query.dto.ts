@@ -1,10 +1,10 @@
-import { IsEnum, IsNotEmpty } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import { IsEnum, IsOptional } from 'class-validator';
+import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Locale } from '@/shared/enums/locale.enum';
 
 export class BasicQuery {
-  @ApiProperty({ enum: Locale, example: Locale.uz, description: 'Locale used to read/write localized fields' })
+  @ApiPropertyOptional({ enum: Locale, example: Locale.uz, default: Locale.uz, description: 'Locale used to read/write localized fields' })
+  @IsOptional()
   @IsEnum(Locale)
-  @IsNotEmpty()
-  locale: Locale;
+  locale: Locale = Locale.uz;
 }
