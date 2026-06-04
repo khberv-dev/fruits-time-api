@@ -7,6 +7,7 @@ import { PosterCreateOrderInput } from '@/core/poster/types/poster-create-order-
 import { PosterResponse } from '@/core/poster/types/poster-response.type';
 import { PosterOrderResponse } from '@/core/poster/types/poster-order-response.type';
 import { PosterSpot } from '@/core/poster/types/poster-spot.type';
+import { PosterStorage } from '@/core/poster/types/poster-storage.type';
 
 @Injectable()
 export class PosterService {
@@ -112,6 +113,40 @@ export class PosterService {
       return typeof id === 'number' ? id : Number(id);
     } catch (error) {
       this.logger.error(`createOrder failed: ${this.formatError(error)}`);
+      return null;
+    }
+  }
+
+  async getStorages(): Promise<PosterStorage[]> {
+    try {
+      const { data } = await this.apiClient.get<PosterResponse<PosterStorage[]>>('/storage.getStorages');
+
+      if (data.error !== undefined && data.error !== 0) {
+        this.logger.error(`getStorages failed: [${JSON.stringify(data.error)}]`);
+        return [];
+      }
+
+      return data.response ?? [];
+    } catch (error) {
+      this.logger.error(`getStorages failed: ${this.formatError(error)}`);
+      return [];
+    }
+  }
+
+  async getProduct(productId: number): Promise<number[] | null> {
+    try {
+      const { data } = await this.apiClient.get<
+        PosterResponse<{ ingredients?: { ingredient_id: string }[] }>
+      >('/menu.getProduct', { params: { product_id: productId } });
+
+      if (data.error !== undefined && data.error !== 0) {
+        this.logger.error(`getProduct failed for ${productId}: [${JSON.stringify(data.error)}]`);
+        return null;
+      }
+
+      return (data.response?.ingredients ?? []).map((i) => Number(i.ingredient_id));
+    } catch (error) {
+      this.logger.error(`getProduct failed for ${productId}: ${this.formatError(error)}`);
       return null;
     }
   }

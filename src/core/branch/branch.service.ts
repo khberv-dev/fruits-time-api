@@ -35,6 +35,10 @@ export class BranchService {
     return this.list();
   }
 
+  getStorages() {
+    return this.posterService.getStorages();
+  }
+
   list(): Promise<Branch[]> {
     return this.branchRepo.find({ where: { isActive: true }, order: { posId: 'ASC' } });
   }
@@ -47,6 +51,7 @@ export class BranchService {
 
     if (data.long !== undefined) branch.long = data.long;
     if (data.lat !== undefined) branch.lat = data.lat;
+    if (data.storageId !== undefined) branch.storageId = data.storageId;
 
     return this.branchRepo.save(branch);
   }

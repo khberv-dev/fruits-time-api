@@ -1,4 +1,4 @@
-import { IsNumber, IsOptional } from 'class-validator';
+import { IsInt, IsNumber, IsOptional } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
 export class UpdateBranchRequest {
@@ -11,4 +11,9 @@ export class UpdateBranchRequest {
   @IsOptional()
   @IsNumber()
   lat?: number;
+
+  @ApiPropertyOptional({ example: 1, description: 'POS storage ID linked to this branch' })
+  @IsOptional()
+  @IsInt()
+  storageId?: number;
 }

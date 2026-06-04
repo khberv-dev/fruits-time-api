@@ -43,6 +43,9 @@ export class Product {
   @JoinColumn({ name: 'catalog_id' })
   catalog: Catalog;
 
+  @Column({ type: 'int', array: true, nullable: true, default: null })
+  ingredients: number[] | null;
+
   @Column({ name: 'is_active', default: true })
   isActive: boolean;
 

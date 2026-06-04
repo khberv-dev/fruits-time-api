@@ -49,6 +49,15 @@ export class BranchController {
     return this.branchService.sync();
   }
 
+  @Get('storages')
+  @Role(UserRole.ADMIN)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'List all POS storages (admin only)' })
+  @ApiOkResponse({ schema: { example: [{ storage_id: 1, storage_name: 'Main Storage' }] } })
+  storages() {
+    return this.branchService.getStorages();
+  }
+
   @Patch(':id')
   @Role(UserRole.ADMIN)
   @ApiBearerAuth('access-token')

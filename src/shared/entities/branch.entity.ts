@@ -20,6 +20,9 @@ export class Branch {
   @Column({ type: 'double precision', nullable: true })
   lat: number | null;
 
+  @Column({ name: 'storage_id', type: 'int', nullable: true, default: null })
+  storageId: number | null;
+
   @Column({ name: 'is_active', default: true })
   isActive: boolean;
 

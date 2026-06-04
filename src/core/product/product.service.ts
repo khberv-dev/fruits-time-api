@@ -1,14 +1,41 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { Product } from '@/shared/entities/product.entity';
-import { Repository } from 'typeorm';
+import { Not, IsNull, Repository } from 'typeorm';
 import { Locale } from '@/shared/enums/locale.enum';
 import { CreateProductRequest } from '@/core/product/dto/create-product-request.dto';
 import { UpdateProductRequest } from '@/core/product/dto/update-product-request.dto';
+import { PosterService } from '@/core/poster/poster.service';
+import { ProductType } from '@/shared/enums/product-type.enum';
 
 @Injectable()
 export class ProductService {
-  constructor(@InjectRepository(Product) private readonly productRepo: Repository<Product>) {}
+  private readonly logger = new Logger(ProductService.name);
+
+  constructor(
+    @InjectRepository(Product) private readonly productRepo: Repository<Product>,
+    private readonly posterService: PosterService,
+  ) {}
+
+  @Cron(CronExpression.EVERY_5_MINUTES)
+  async syncIngredients(): Promise<void> {
+    const products = await this.productRepo.find({
+      where: { posId: Not(IsNull()), type: ProductType.JUICE },
+    });
+
+    let updated = 0;
+    for (const product of products) {
+      const ingredients = await this.posterService.getProduct(product.posId);
+      if (ingredients === null) continue;
+      await this.productRepo.update(product.id, { ingredients });
+      updated++;
+    }
+
+    if (updated) {
+      this.logger.log(`syncIngredients: updated ${updated}/${products.length} products`);
+    }
+  }
 
   async findAll(catalogId: string, locale: Locale, filterInactive: boolean = true) {
     const qb = this.productRepo.createQueryBuilder('p');
