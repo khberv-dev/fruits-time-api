@@ -51,9 +51,9 @@ export class AssistantService implements OnModuleInit {
     });
 
     const session: AssistantMessage[] = [];
-    let cursor = Date.now();
+    let cursor: number | null = null;
     for (const message of recent) {
-      if (cursor - message.createdAt.getTime() > SESSION_GAP_MS) break;
+      if (cursor !== null && cursor - message.createdAt.getTime() > SESSION_GAP_MS) break;
       session.push(message);
       cursor = message.createdAt.getTime();
     }
