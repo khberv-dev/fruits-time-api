@@ -158,7 +158,7 @@ export class PosterService {
   async getProduct(productId: number): Promise<number[] | null> {
     try {
       const { data } = await this.apiClient.get<
-        PosterResponse<{ ingredients?: { ingredient_id: string }[] }>
+        PosterResponse<{ ingredient_id?: string; ingredients?: { ingredient_id: string }[] }>
       >('/menu.getProduct', { params: { product_id: productId } });
 
       if (data.error !== undefined && data.error !== 0) {
@@ -166,7 +166,13 @@ export class PosterService {
         return null;
       }
 
-      return (data.response?.ingredients ?? []).map((i) => Number(i.ingredient_id));
+      const ingredients = data.response?.ingredients ?? [];
+      if (ingredients.length > 0) {
+        return ingredients.map((i) => Number(i.ingredient_id));
+      }
+
+      const fallbackId = Number(data.response?.ingredient_id);
+      return fallbackId ? [fallbackId] : [];
     } catch (error) {
       this.logger.error(`getProduct failed for ${productId}: ${this.formatError(error)}`);
       return null;
