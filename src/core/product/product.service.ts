@@ -61,7 +61,7 @@ export class ProductService {
   @Cron(CronExpression.EVERY_5_MINUTES)
   async syncIngredients(): Promise<void> {
     const products = await this.productRepo.find({
-      where: { posId: Not(IsNull()), type: ProductType.JUICE },
+      where: { posId: Not(IsNull()) },
     });
 
     let updated = 0;
