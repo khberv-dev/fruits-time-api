@@ -8,7 +8,6 @@ import { Locale } from '@/shared/enums/locale.enum';
 import { CreateProductRequest } from '@/core/product/dto/create-product-request.dto';
 import { UpdateProductRequest } from '@/core/product/dto/update-product-request.dto';
 import { PosterService } from '@/core/poster/poster.service';
-import { ProductType } from '@/shared/enums/product-type.enum';
 import { ProductAvailability } from '@/shared/types/product-availability.type';
 
 @Injectable()
@@ -39,13 +38,10 @@ export class ProductService {
         const leftovers = leftoversPerStorage.get(branch.storageId!)!;
         let left = false;
 
-        if (product.type === ProductType.JUICE) {
-          left =
-            product.ingredients !== null &&
-            product.ingredients.length > 0 &&
-            product.ingredients.every((id) => leftovers.get(id) === true);
-        } else if (product.type === ProductType.VITAMIN) {
-          left = product.posId !== null && leftovers.get(product.posId) === true;
+        if (product.ingredients !== null && product.ingredients.length > 0) {
+          left = product.ingredients.every((id) => leftovers.get(id) === true);
+        } else if (product.posId !== null) {
+          left = leftovers.get(product.posId) === true;
         }
 
         return { storage_id: branch.storageId!, left };
