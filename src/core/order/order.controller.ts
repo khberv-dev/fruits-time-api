@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Post, Query } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
   ApiBearerAuth,
@@ -14,6 +14,7 @@ import type { ReqUser } from '@/shared/types/req-user.type';
 import { CreateOrderRequest } from '@/core/order/dto/create-order-request.dto';
 import { DeliveryCostQuery } from '@/core/order/dto/delivery-cost-query.dto';
 import { BasicQuery } from '@/shared/dto/basic-query.dto';
+import { IsPublic } from '@/common/decorators/is_public.decorator';
 
 const orderExample = {
   id: '7e9f2d3b-1234-4abc-9d8e-2c4f6a1b3c5d',
@@ -127,5 +128,15 @@ export class OrderController {
   @ApiUnauthorizedResponse({ description: 'Missing or invalid access token' })
   list(@RequestUser() user: ReqUser, @Query() query: BasicQuery) {
     return this.orderService.listForUser(user.id, query.locale);
+  }
+
+  @Post('handle-order')
+  @IsPublic()
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Delivery service order status webhook' })
+  @ApiOkResponse({ schema: { example: { ok: true } } })
+  handleOrder(@Body() body: unknown) {
+    this.orderService.handleDeliveryWebhook(body);
+    return { ok: true };
   }
 }

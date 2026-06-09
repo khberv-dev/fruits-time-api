@@ -258,6 +258,10 @@ export class OrderService {
     return orders.map((order) => this.mapOrder(order, locale));
   }
 
+  handleDeliveryWebhook(body: unknown): void {
+    this.logger.log(`handle-order webhook: ${JSON.stringify(body)}`);
+  }
+
   private mapOrder(order: Order, locale: Locale) {
     return {
       id: order.id,

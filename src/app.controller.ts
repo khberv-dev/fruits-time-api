@@ -10,8 +10,6 @@ export class AppController {
   @ApiOperation({ summary: 'Liveness probe' })
   @ApiOkResponse({ schema: { example: { ok: true } } })
   getStatus() {
-    return {
-      ok: true,
-    };
+    return { ok: true };
   }
 }
