@@ -21,35 +21,35 @@ import { calculateDeliveryCost } from '@/shared/utils/lib';
 import { DeliveryWebhookBody } from '@/core/delivery/types/delivery-webhook-body.type';
 
 const DELIVERY_STAGE_MESSAGE: Record<number, string> = {
-  1: "Buyurtmangiz qabul qilindi",
-  2: "Buyurtmangiz narxi hisoblanmoqda",
+  1: 'Buyurtmangiz qabul qilindi',
+  2: 'Buyurtmangiz narxi hisoblanmoqda',
   3: "Buyurtmangiz to'lovga tayyor",
-  4: "Buyurtmangiz rejalashtirildi",
-  5: "Kuryer qidirilmoqda",
-  6: "Kuryer tayinlanmoqda",
-  7: "Kuryer topildi",
+  4: 'Buyurtmangiz rejalashtirildi',
+  5: 'Kuryer qidirilmoqda',
+  6: 'Kuryer tayinlanmoqda',
+  7: 'Kuryer topildi',
   8: "Kuryer do'konga yetib keldi",
-  9: "Buyurtmangiz olinishga tayyor",
-  10: "Buyurtmangiz kuryer tomonidan qabul qilindi",
-  11: "Kuryer manzilingizga yetib keldi",
-  12: "Buyurtmangiz topshirishga tayyor",
+  9: 'Buyurtmangiz olinishga tayyor',
+  10: 'Buyurtmangiz kuryer tomonidan qabul qilindi',
+  11: 'Kuryer manzilingizga yetib keldi',
+  12: 'Buyurtmangiz topshirishga tayyor',
   13: "To'lov kutilmoqda",
-  14: "Buyurtmangiz yetkazib berildi",
-  15: "Buyurtmangiz muvaffaqiyatli yakunlandi",
-  16: "Buyurtmangiz qaytarilmoqda",
-  17: "Kuryer qaytish manziliga yetib keldi",
-  18: "Buyurtmangiz qaytarishga tayyor",
-  19: "Buyurtmangiz qaytarildi",
-  20: "Buyurtmangiz qaytarish yakunlandi",
-  21: "Buyurtmangiz taksi tomonidan bekor qilindi",
-  22: "Buyurtmangiz bekor qilindi",
+  14: 'Buyurtmangiz yetkazib berildi',
+  15: 'Buyurtmangiz muvaffaqiyatli yakunlandi',
+  16: 'Buyurtmangiz qaytarilmoqda',
+  17: 'Kuryer qaytish manziliga yetib keldi',
+  18: 'Buyurtmangiz qaytarishga tayyor',
+  19: 'Buyurtmangiz qaytarildi',
+  20: 'Buyurtmangiz qaytarish yakunlandi',
+  21: 'Buyurtmangiz taksi tomonidan bekor qilindi',
+  22: 'Buyurtmangiz bekor qilindi',
   23: "Buyurtmangiz to'lov bilan bekor qilindi",
-  24: "Buyurtmangiz bekor qilindi",
-  25: "Buyurtmangizda xatolik yuz berdi",
-  26: "Narxni hisoblashda xatolik yuz berdi",
-  27: "Kuryer topilmadi",
-  28: "Yetkazib berish hududidan tashqarida",
-  29: "Yetkazib berish masofasidan tashqarida",
+  24: 'Buyurtmangiz bekor qilindi',
+  25: 'Buyurtmangizda xatolik yuz berdi',
+  26: 'Narxni hisoblashda xatolik yuz berdi',
+  27: 'Kuryer topilmadi',
+  28: 'Yetkazib berish hududidan tashqarida',
+  29: 'Yetkazib berish masofasidan tashqarida',
 };
 
 function stageToOrderStatus(stage: number): OrderStatus | null {
@@ -105,7 +105,7 @@ export class OrderService {
 
   async create(userId: string, locale: Locale, data: CreateOrderRequest) {
     const activeOrder = await this.orderRepo.findOne({ where: { user: { id: userId }, status: OrderStatus.CREATED } });
-    if (activeOrder) throw new BadRequestException("Sizda allaqachon faol buyurtma mavjud");
+    if (activeOrder) throw new BadRequestException('Sizda allaqachon faol buyurtma mavjud');
 
     const productIds = [...new Set(data.items.map((item) => item.productId))];
 

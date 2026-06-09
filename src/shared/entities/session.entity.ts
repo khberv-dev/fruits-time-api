@@ -1,4 +1,12 @@
-import { Column, CreateDateColumn, Entity, JoinColumn, OneToOne, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
+import {
+  Column,
+  CreateDateColumn,
+  Entity,
+  JoinColumn,
+  OneToOne,
+  PrimaryGeneratedColumn,
+  UpdateDateColumn,
+} from 'typeorm';
 import { User } from '@/shared/entities/user.entity';
 import { Os } from '@/shared/enums/os.enum';
 import { Locale } from '@/shared/enums/locale.enum';

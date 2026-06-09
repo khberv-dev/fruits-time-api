@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { Product } from '@/shared/entities/product.entity';
 import { Branch } from '@/shared/entities/branch.entity';
-import { Not, IsNull, Repository } from 'typeorm';
+import { IsNull, Not, Repository } from 'typeorm';
 import { Locale } from '@/shared/enums/locale.enum';
 import { CreateProductRequest } from '@/core/product/dto/create-product-request.dto';
 import { UpdateProductRequest } from '@/core/product/dto/update-product-request.dto';
