@@ -117,6 +117,14 @@ export class OrderController {
     return this.orderService.getDeliveryCost(user.id, query.branchId, query.addressId);
   }
 
+  @Get('active')
+  @ApiOperation({ summary: "Get the authenticated user's active (pending) order, or null" })
+  @ApiOkResponse({ description: 'Active order or null', schema: { example: orderExample } })
+  @ApiUnauthorizedResponse({ description: 'Missing or invalid access token' })
+  getActive(@RequestUser() user: ReqUser, @Query() query: BasicQuery) {
+    return this.orderService.getActiveForUser(user.id, query.locale);
+  }
+
   @Get()
   @ApiOperation({
     summary: "List the authenticated user's orders (newest first)",

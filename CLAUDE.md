@@ -31,11 +31,11 @@ Path alias: `@/*` → `src/*` (see `tsconfig.json`). Use this in imports rather 
 
 ## Architecture
 
-NestJS 11 + TypeORM (Postgres) + Passport JWT. `src/main.ts` boots the app with global prefix `/api`, CORS enabled, and a global `validationPipe` (`whitelist`, `forbidNonWhitelisted`, `transform: true`) defined in `src/common/pipes/validation.pipe.ts`.
+NestJS 11 + TypeORM (Postgres) + Passport JWT. `src/main.ts` boots the app with global prefix `/api`, CORS enabled, and a global `validationPipe` (`whitelist`, `forbidNonWhitelisted`, `transform: true`) defined in `src/common/pipes/validation.pipe.ts`. Swagger UI is served at `/docs` (no auth required).
 
 ### Module layout
 
-- `src/core/*` — feature modules: `auth`, `user`, `catalog`, `product`, `banner`, `order`, `address`, `branch`, `stats`, `assistant`, `notify`, `poster`, `delivery`. Each is a self-contained NestJS module with controller/service/dto.
+- `src/core/*` — feature modules: `auth`, `user`, `catalog`, `product`, `banner`, `order`, `address`, `branch`, `stats`, `assistant`, `notify`, `poster`, `delivery`, `session`. Each is a self-contained NestJS module with controller/service/dto.
 - `src/shared/` — cross-cutting code: TypeORM `entities/`, `enums/`, `dto/` (query/pagination/search), `types/`, `utils/lib.ts` (bcrypt + OTP helpers), and `config/database.config.ts` (the single TypeORM `DataSource`).
 - `src/common/` — framework wiring: `guards/` (JWT access/refresh, role), `decorators/` (`@IsPublic`, `@Role`, `@RequestUser`), `pipes/`, and `interceptors/upload-file.interceptor.ts` (multer disk storage at `uploads/<entity>/<uuid><ext>`).
 
@@ -78,6 +78,22 @@ Any external API failure throws an `InternalServerErrorException` and rolls back
 ### User referral / status tiers
 
 `STATUS_TIERS` in `user.service.ts` maps referral count → `UserStatus` (SILVER / GOLD / VIP / PREMIUM) and discount percentage (0 / 3 / 7 / 12 %). `computeUserStatus` and `getStatusDiscount` are exported and consumed by `OrderService` to price order items.
+
+### Session module
+
+`Session` (one per user, `OneToOne`) stores `fcmToken`, `os` (`Os` enum), and `locale` for push-notification targeting. `POST /session` upserts on `user_id` conflict; `PATCH /session` updates an existing record and throws `NotFoundException` if none exists.
+
+### Scheduled cron jobs
+
+Three `@Cron` tasks run continuously:
+
+| Job | Interval | What it does |
+|-----|----------|--------------|
+| `BranchService.syncSpots` | every 10 min | Upserts branches from Poster `spots.getSpots` by `posId` |
+| `ProductService.syncIngredients` | every 5 min | Fetches ingredient IDs per product from `menu.getProduct` |
+| `ProductService.syncAvailability` | every 10 min | Computes per-branch `available[]` from storage leftovers |
+
+`syncAvailability` depends on `ingredients` being populated by `syncIngredients`. Availability is stored as `jsonb ProductAvailability[]` on `Product` (`{ storage_id, left }`).
 
 ### Assistant module
 

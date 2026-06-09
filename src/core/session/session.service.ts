@@ -11,7 +11,7 @@ export class SessionService {
 
   async create(userId: string, data: UpsertSessionRequest): Promise<Session | null> {
     await this.sessionRepo.upsert(
-      { user: { id: userId } as User, fcmToken: data.fcmToken, os: data.os },
+      { user: { id: userId } as User, fcmToken: data.fcmToken, os: data.os, locale: data.locale },
       { conflictPaths: ['user'] },
     );
     return this.sessionRepo.findOne({ where: { user: { id: userId } } });
@@ -20,7 +20,7 @@ export class SessionService {
   async update(userId: string, data: UpsertSessionRequest): Promise<Session> {
     const session = await this.sessionRepo.findOne({ where: { user: { id: userId } } });
     if (!session) throw new NotFoundException('Session not found');
-    await this.sessionRepo.update(session.id, { fcmToken: data.fcmToken, os: data.os });
+    await this.sessionRepo.update(session.id, { fcmToken: data.fcmToken, os: data.os, locale: data.locale });
     return { ...session, fcmToken: data.fcmToken, os: data.os };
   }
 }

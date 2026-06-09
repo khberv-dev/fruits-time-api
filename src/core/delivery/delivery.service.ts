@@ -74,13 +74,13 @@ export class DeliveryService {
             },
           },
         ],
-        payment_type: 'BALANCE',
+        payment_type: 'CASH',
         delivery: {
           type: 'EXPRESS',
           time: null,
           send_link: true,
           door_to_door: false,
-          product_paid: true,
+          product_paid: false,
           equipment_id: 1,
         },
       });

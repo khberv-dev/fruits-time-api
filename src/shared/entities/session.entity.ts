@@ -1,6 +1,7 @@
 import { Column, CreateDateColumn, Entity, JoinColumn, OneToOne, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
 import { User } from '@/shared/entities/user.entity';
 import { Os } from '@/shared/enums/os.enum';
+import { Locale } from '@/shared/enums/locale.enum';
 
 @Entity('sessions')
 export class Session {
@@ -16,6 +17,9 @@ export class Session {
 
   @Column({ type: 'enum', enum: Os })
   os: Os;
+
+  @Column({ type: 'enum', enum: Locale, default: Locale.uz })
+  locale: Locale;
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;

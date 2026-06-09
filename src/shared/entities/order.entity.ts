@@ -35,6 +35,9 @@ export class Order {
   @Column({ name: 'pos_id', type: 'int', nullable: true })
   posId: number | null;
 
+  @Column({ type: 'text', nullable: true, default: null })
+  link: string | null;
+
   @OneToMany(() => OrderItem, (item) => item.order, { cascade: true })
   items: OrderItem[];
 

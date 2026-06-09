@@ -7,15 +7,56 @@ import { Product } from '@/shared/entities/product.entity';
 import { User } from '@/shared/entities/user.entity';
 import { Branch } from '@/shared/entities/branch.entity';
 import { Address } from '@/shared/entities/address.entity';
+import { Session } from '@/shared/entities/session.entity';
 import { Coordinates } from '@/shared/types/coordinates.type';
 import { Locale } from '@/shared/enums/locale.enum';
 import { CreateOrderRequest } from '@/core/order/dto/create-order-request.dto';
 import { PosterService } from '@/core/poster/poster.service';
 import { DeliveryService } from '@/core/delivery/delivery.service';
+import { PushService } from '@/core/notify/push.service';
 import { OrderType } from '@/shared/enums/order-type.enum';
 import { OrderStatus } from '@/shared/enums/order-status.enum';
 import { computeUserStatus, getStatusDiscount } from '@/core/user/user.service';
 import { calculateDeliveryCost } from '@/shared/utils/lib';
+import { DeliveryWebhookBody } from '@/core/delivery/types/delivery-webhook-body.type';
+
+const DELIVERY_STAGE_MESSAGE: Record<number, string> = {
+  1: "Buyurtmangiz qabul qilindi",
+  2: "Buyurtmangiz narxi hisoblanmoqda",
+  3: "Buyurtmangiz to'lovga tayyor",
+  4: "Buyurtmangiz rejalashtirildi",
+  5: "Kuryer qidirilmoqda",
+  6: "Kuryer tayinlanmoqda",
+  7: "Kuryer topildi",
+  8: "Kuryer do'konga yetib keldi",
+  9: "Buyurtmangiz olinishga tayyor",
+  10: "Buyurtmangiz kuryer tomonidan qabul qilindi",
+  11: "Kuryer manzilingizga yetib keldi",
+  12: "Buyurtmangiz topshirishga tayyor",
+  13: "To'lov kutilmoqda",
+  14: "Buyurtmangiz yetkazib berildi",
+  15: "Buyurtmangiz muvaffaqiyatli yakunlandi",
+  16: "Buyurtmangiz qaytarilmoqda",
+  17: "Kuryer qaytish manziliga yetib keldi",
+  18: "Buyurtmangiz qaytarishga tayyor",
+  19: "Buyurtmangiz qaytarildi",
+  20: "Buyurtmangiz qaytarish yakunlandi",
+  21: "Buyurtmangiz taksi tomonidan bekor qilindi",
+  22: "Buyurtmangiz bekor qilindi",
+  23: "Buyurtmangiz to'lov bilan bekor qilindi",
+  24: "Buyurtmangiz bekor qilindi",
+  25: "Buyurtmangizda xatolik yuz berdi",
+  26: "Narxni hisoblashda xatolik yuz berdi",
+  27: "Kuryer topilmadi",
+  28: "Yetkazib berish hududidan tashqarida",
+  29: "Yetkazib berish masofasidan tashqarida",
+};
+
+function stageToOrderStatus(stage: number): OrderStatus | null {
+  if (stage === 14 || stage === 15) return OrderStatus.DONE;
+  if (stage >= 19 && stage <= 29) return OrderStatus.CANCELLED;
+  return null;
+}
 
 function applyDiscount(price: number, discountPercent: number): number {
   return Math.round(price * (1 - discountPercent / 100));
@@ -33,8 +74,10 @@ export class OrderService {
     @InjectRepository(User) private readonly userRepo: Repository<User>,
     @InjectRepository(Branch) private readonly branchRepo: Repository<Branch>,
     @InjectRepository(Address) private readonly addressRepo: Repository<Address>,
+    @InjectRepository(Session) private readonly sessionRepo: Repository<Session>,
     private readonly posterService: PosterService,
     private readonly deliveryService: DeliveryService,
+    private readonly pushService: PushService,
   ) {}
 
   @Cron(CronExpression.EVERY_5_MINUTES)
@@ -61,6 +104,9 @@ export class OrderService {
   }
 
   async create(userId: string, locale: Locale, data: CreateOrderRequest) {
+    const activeOrder = await this.orderRepo.findOne({ where: { user: { id: userId }, status: OrderStatus.CREATED } });
+    if (activeOrder) throw new BadRequestException("Sizda allaqachon faol buyurtma mavjud");
+
     const productIds = [...new Set(data.items.map((item) => item.productId))];
 
     const products = await this.productRepo.find({ where: { id: In(productIds), isActive: true } });
@@ -248,6 +294,14 @@ export class OrderService {
     return posOrderId;
   }
 
+  async getActiveForUser(userId: string, locale: Locale) {
+    const order = await this.orderRepo.findOne({
+      where: { user: { id: userId }, status: OrderStatus.CREATED },
+      relations: ['items', 'items.product'],
+    });
+    return order ? this.mapOrder(order, locale) : null;
+  }
+
   async listForUser(userId: string, locale: Locale) {
     const orders = await this.orderRepo.find({
       where: { user: { id: userId } },
@@ -260,6 +314,41 @@ export class OrderService {
 
   handleDeliveryWebhook(body: unknown): void {
     this.logger.log(`handle-order webhook: ${JSON.stringify(body)}`);
+    this.processDeliveryWebhook(body as DeliveryWebhookBody).catch((err: unknown) => {
+      this.logger.error(`processDeliveryWebhook failed: ${err instanceof Error ? err.message : String(err)}`);
+    });
+  }
+
+  private async processDeliveryWebhook(body: DeliveryWebhookBody): Promise<void> {
+    const order = await this.orderRepo.findOne({
+      where: { id: body.vendor_order_id },
+      relations: ['user'],
+    });
+
+    if (!order) {
+      this.logger.warn(`Webhook: order ${body.vendor_order_id} not found`);
+      return;
+    }
+
+    const updates: Partial<Order> = {};
+
+    const newStatus = stageToOrderStatus(body.stage);
+    if (newStatus !== null) updates.status = newStatus;
+
+    const link = body.order?.link ?? null;
+    if (link !== null) updates.link = link;
+
+    if (Object.keys(updates).length) {
+      await this.orderRepo.update(order.id, updates);
+    }
+
+    const session = await this.sessionRepo.findOne({ where: { user: { id: order.user.id } } });
+    if (session?.fcmToken) {
+      const message = DELIVERY_STAGE_MESSAGE[body.stage];
+      if (message) {
+        await this.pushService.send(session.fcmToken, 'Fruits Time', message);
+      }
+    }
   }
 
   private mapOrder(order: Order, locale: Locale) {
@@ -269,6 +358,7 @@ export class OrderService {
       status: order.status,
       type: order.type,
       address: order.address,
+      link: order.link,
       createdAt: order.createdAt,
       updatedAt: order.updatedAt,
       items: order.items.map((item) => ({
