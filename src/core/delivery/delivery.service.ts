@@ -40,6 +40,60 @@ export class DeliveryService {
     });
   }
 
+  async evalOrder(input: DeliveryCreateOrderInput): Promise<number | null> {
+    try {
+      const { data } = await this.apiClient.post<{ total_delivery_price: number; evaluated_stage: number }>(
+        '/orders/eval',
+        {
+          vendor_order_id: input.vendorOrderId,
+          origin: [
+            {
+              order: 1,
+              entrance: '0',
+              door_phone: '0',
+              floor: 0,
+              apartment: '0',
+              location: input.origin.location,
+              address: input.origin.address,
+              client: input.origin.client,
+            },
+          ],
+          destination: [
+            {
+              order: 2,
+              entrance: '0',
+              door_phone: '0',
+              floor: 0,
+              apartment: '0',
+              location: input.destination.location,
+              address: input.destination.address,
+              client: input.destination.client,
+              comment: '',
+              products: {
+                type_id: 2,
+                description: 'Sharbat',
+                items: input.items,
+              },
+            },
+          ],
+          payment_type: 'CASH',
+          delivery: {
+            type: 'EXPRESS',
+            time: null,
+            send_link: true,
+            door_to_door: false,
+            product_paid: false,
+            equipment_id: 1,
+          },
+        },
+      );
+      return data.total_delivery_price ?? null;
+    } catch (error) {
+      this.logger.error(`evalOrder failed: ${this.formatError(error)}`);
+      return null;
+    }
+  }
+
   async createOrder(input: DeliveryCreateOrderInput): Promise<boolean> {
     try {
       await this.apiClient.post('/orders', {

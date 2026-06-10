@@ -17,7 +17,7 @@ import { PushService } from '@/core/notify/push.service';
 import { OrderType } from '@/shared/enums/order-type.enum';
 import { OrderStatus } from '@/shared/enums/order-status.enum';
 import { computeUserStatus, getStatusDiscount } from '@/core/user/user.service';
-import { calculateDeliveryCost } from '@/shared/utils/lib';
+import { DeliveryCreateOrderInput } from '@/core/delivery/types/delivery-create-order-input.type';
 import { DeliveryWebhookBody } from '@/core/delivery/types/delivery-webhook-body.type';
 
 const DELIVERY_STAGE_MESSAGE: Record<number, string> = {
@@ -93,14 +93,28 @@ export class OrderService {
   }
 
   async getDeliveryCost(userId: string, branchId: string, addressId: string): Promise<{ cost: number }> {
-    const branch = await this.branchRepo.findOne({ where: { id: branchId, isActive: true } });
+    const [branch, address, user] = await Promise.all([
+      this.branchRepo.findOne({ where: { id: branchId, isActive: true } }),
+      this.addressRepo.findOne({ where: { id: addressId, user: { id: userId } } }),
+      this.userRepo.findOne({ where: { id: userId } }),
+    ]);
+
     if (!branch) throw new BadRequestException('Filial topilmadi yoki faol emas');
     if (branch.lat === null || branch.long === null) throw new BadRequestException('Filial koordinatalari sozlanmagan');
-
-    const address = await this.addressRepo.findOne({ where: { id: addressId, user: { id: userId } } });
+    if (!branch.address) throw new BadRequestException('Filial manzili sozlanmagan');
     if (!address) throw new BadRequestException('Manzil topilmadi');
+    if (!user) throw new BadRequestException('Foydalanuvchi topilmadi');
 
-    return { cost: calculateDeliveryCost(branch.lat, branch.long, address.lat, address.long) };
+    const clientPhone = user.phoneNumber.startsWith('+') ? user.phoneNumber : `+${user.phoneNumber}`;
+    const cost = await this.deliveryService.evalOrder({
+      vendorOrderId: 'eval',
+      items: [],
+      origin: { location: { long: branch.long, lat: branch.lat }, address: branch.address, client: { phone: clientPhone, name: user.firstName } },
+      destination: { location: { long: address.long, lat: address.lat }, address: address.name, client: { phone: clientPhone, name: user.firstName } },
+    });
+
+    if (cost === null) throw new InternalServerErrorException("Yetkazib berish narxini hisoblashda xatolik");
+    return { cost };
   }
 
   async create(userId: string, locale: Locale, data: CreateOrderRequest) {
@@ -143,6 +157,37 @@ export class OrderService {
 
     const productById = new Map(products.map((product) => [product.id, product]));
 
+    let deliveryInput: DeliveryCreateOrderInput | null = null;
+    let deliveryCost: number | undefined;
+
+    if (data.type === OrderType.DELIVERY && savedAddress) {
+      const user = await this.userRepo.findOne({ where: { id: userId } });
+      if (!user) throw new InternalServerErrorException('Foydalanuvchi topilmadi');
+      if (branch.long === null || branch.lat === null) throw new InternalServerErrorException('Filial koordinatalari sozlanmagan');
+      if (!branch.address) throw new InternalServerErrorException('Filial manzili sozlanmagan');
+
+      const clientPhone = user.phoneNumber.startsWith('+') ? user.phoneNumber : `+${user.phoneNumber}`;
+      const client = { phone: clientPhone, name: user.firstName };
+
+      deliveryInput = {
+        vendorOrderId: '',
+        items: data.items.map((item) => {
+          const product = productById.get(item.productId)!;
+          return {
+            name: product.getTitle(locale),
+            price_per_unit: applyDiscount(product.price, discountPercent),
+            quantity: item.quantity,
+            width: 10, height: 10, length: 10, weight: 10,
+          };
+        }),
+        origin: { location: { long: branch.long, lat: branch.lat }, address: branch.address, client },
+        destination: { location: { long: savedAddress.long, lat: savedAddress.lat }, address: savedAddress.name, client },
+      };
+
+      const evaluated = await this.deliveryService.evalOrder({ ...deliveryInput, vendorOrderId: 'eval' });
+      deliveryCost = evaluated ?? undefined;
+    }
+
     // Save the order, call POS, and (if delivery) call the delivery service in
     // a single transaction so any external failure rolls back the DB row.
     const order = await this.orderRepo.manager.transaction(async (manager) => {
@@ -168,16 +213,11 @@ export class OrderService {
         relations: ['items', 'items.product'],
       });
 
-      const deliveryCost =
-        data.type === OrderType.DELIVERY && branch.lat !== null && branch.long !== null && savedAddress
-          ? calculateDeliveryCost(branch.lat, branch.long, savedAddress.lat, savedAddress.long)
-          : undefined;
-
       order.posId = await this.sendToPoster(userId, products, data, branch.posId, discountPercent, deliveryCost);
       await orderRepo.save(order);
 
-      if (data.type === OrderType.DELIVERY) {
-        await this.sendToDelivery(order, branch, savedAddress, userId, locale);
+      if (data.type === OrderType.DELIVERY && deliveryInput) {
+        await this.sendToDelivery(order, deliveryInput);
       }
 
       return order;
@@ -186,62 +226,8 @@ export class OrderService {
     return this.mapOrder(order, locale);
   }
 
-  private async sendToDelivery(
-    order: Order,
-    branch: Branch,
-    address: Address | null,
-    userId: string,
-    locale: Locale,
-  ): Promise<void> {
-    if (!address) {
-      // Pre-validated in create(); defensive.
-      throw new BadRequestException("Yetkazib berish uchun manzil ko'rsatilishi shart");
-    }
-
-    if (branch.long === null || branch.lat === null) {
-      this.logger.error(`Delivery rejected: branch ${branch.id} has no coordinates`);
-      throw new InternalServerErrorException('Filial koordinatalari sozlanmagan');
-    }
-
-    if (!branch.address) {
-      this.logger.error(`Delivery rejected: branch ${branch.id} has no address`);
-      throw new InternalServerErrorException('Filial manzili sozlanmagan');
-    }
-
-    const user = await this.userRepo.findOne({ where: { id: userId } });
-    if (!user) {
-      throw new InternalServerErrorException('Foydalanuvchi topilmadi');
-    }
-
-    const ok = await this.deliveryService.createOrder({
-      vendorOrderId: order.id,
-      items: order.items.map((item) => ({
-        name: item.product.getTitle(locale),
-        price_per_unit: Math.round(item.price / item.quantity),
-        quantity: item.quantity,
-        width: 10,
-        height: 10,
-        length: 10,
-        weight: 10,
-      })),
-      origin: {
-        location: { long: branch.long, lat: branch.lat },
-        address: branch.address,
-        client: {
-          phone: user.phoneNumber.startsWith('+') ? user.phoneNumber : `+${user.phoneNumber}`,
-          name: user.firstName,
-        },
-      },
-      destination: {
-        location: { long: address.long, lat: address.lat },
-        address: address.name,
-        client: {
-          phone: user.phoneNumber.startsWith('+') ? user.phoneNumber : `+${user.phoneNumber}`,
-          name: user.firstName,
-        },
-      },
-    });
-
+  private async sendToDelivery(order: Order, input: DeliveryCreateOrderInput): Promise<void> {
+    const ok = await this.deliveryService.createOrder({ ...input, vendorOrderId: order.id });
     if (!ok) {
       throw new InternalServerErrorException("Yetkazib berish xizmatiga buyurtma yuborib bo'lmadi");
     }
