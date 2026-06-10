@@ -54,7 +54,6 @@ const DELIVERY_STAGE_MESSAGE: Record<number, string> = {
 
 function stageToOrderStatus(stage: number): OrderStatus | null {
   if (stage === 14 || stage === 15) return OrderStatus.DONE;
-  if (stage >= 19 && stage <= 29) return OrderStatus.CANCELLED;
   return null;
 }
 
