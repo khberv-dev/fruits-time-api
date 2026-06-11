@@ -111,7 +111,7 @@ export class OrderService {
       origin: {
         location: { long: branch.long, lat: branch.lat },
         address: branch.address,
-        client: { phone: branch.managerPhone ?? userPhone, name: branch.managerName ?? user.firstName },
+        client: { phone: branch.managerPhone ?? 'Belgilanmagan', name: branch.managerName ?? 'Belgilanmagan' },
       },
       destination: {
         location: { long: address.long, lat: address.lat },
@@ -180,8 +180,8 @@ export class OrderService {
 
       const userPhone = user.phoneNumber.startsWith('+') ? user.phoneNumber : `+${user.phoneNumber}`;
       const originClient = {
-        phone: branch.managerPhone ?? userPhone,
-        name: branch.managerName ?? user.firstName,
+        phone: branch.managerPhone ?? 'Belgilanmagan',
+        name: branch.managerName ?? 'Belgilanmagan',
       };
       const destinationClient = { phone: userPhone, name: user.firstName };
 
@@ -237,6 +237,7 @@ export class OrderService {
       });
 
       order.posId = await this.sendToPoster(userId, products, data, branch.posId, discountPercent, deliveryCost);
+      order.deliveryCost = deliveryCost ?? null;
       await orderRepo.save(order);
 
       if (data.type === OrderType.DELIVERY && deliveryInput) {
@@ -368,6 +369,7 @@ export class OrderService {
       type: order.type,
       address: order.address,
       link: order.link,
+      deliveryCost: order.deliveryCost,
       createdAt: order.createdAt,
       updatedAt: order.updatedAt,
       items: order.items.map((item) => ({

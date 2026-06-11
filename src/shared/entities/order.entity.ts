@@ -35,6 +35,9 @@ export class Order {
   @Column({ name: 'pos_id', type: 'int', nullable: true })
   posId: number | null;
 
+  @Column({ name: 'delivery_cost', type: 'int', nullable: true, default: null })
+  deliveryCost: number | null;
+
   @Column({ type: 'text', nullable: true, default: null })
   link: string | null;
 
