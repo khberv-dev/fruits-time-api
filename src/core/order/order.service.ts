@@ -185,8 +185,14 @@ export class OrderService {
       };
       const destinationClient = { phone: userPhone, name: user.firstName };
 
+      const discountAmount = data.items.reduce((sum, item) => {
+        const product = productById.get(item.productId)!;
+        return sum + (product.price - applyDiscount(product.price, discountPercent)) * item.quantity;
+      }, 0);
+
       deliveryInput = {
         vendorOrderId: '',
+        discountAmount,
         items: data.items.map((item) => {
           const product = productById.get(item.productId)!;
           return {

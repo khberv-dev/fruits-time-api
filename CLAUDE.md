@@ -27,6 +27,7 @@ Path alias: `@/*` → `src/*` (see `tsconfig.json`). Use this in imports rather 
 - `ESKIZ_SMS_*` — Eskiz SMS gateway used to deliver OTPs.
 - `POSTER_API_URL` / `POSTER_API_KEY` — Poster POS integration (branch sync, order creation, client creation).
 - `DELIVERY_API_URL` / `DELIVERY_API_KEY` — Noor delivery service integration.
+- `FIREBASE_SERVICE_ACCOUNT` — JSON string of a Firebase service-account credential; powers FCM push notifications via `firebase-admin`. If absent, `PushService` logs a warning and silently skips all sends.
 - `PORT` — HTTP port (default `8000`).
 
 ## Architecture

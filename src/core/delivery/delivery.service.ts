@@ -64,9 +64,16 @@ export class DeliveryService {
   }
 
   private buildBody(input: DeliveryCreateOrderInput) {
-    const discountedTotal = input.items.reduce((sum, item) => sum + item.price_per_unit * item.quantity, 0);
     const extra: typeof input.items = [
-      { name: 'Chegirma', price_per_unit: -discountedTotal, quantity: 1, width: 0, height: 0, length: 0, weight: 0 },
+      {
+        name: 'Chegirma',
+        price_per_unit: -(input.discountAmount ?? 0),
+        quantity: 1,
+        width: 0,
+        height: 0,
+        length: 0,
+        weight: 0,
+      },
       {
         name: 'Yetkazib berish',
         price_per_unit: input.deliveryCost ?? 0,

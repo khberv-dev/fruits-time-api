@@ -22,6 +22,7 @@ export interface DeliveryOrderItem {
 export interface DeliveryCreateOrderInput {
   vendorOrderId: string;
   items: DeliveryOrderItem[];
+  discountAmount?: number;
   deliveryCost?: number;
   origin: {
     location: DeliveryLocation;
