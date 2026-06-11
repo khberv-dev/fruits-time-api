@@ -44,48 +44,7 @@ export class DeliveryService {
     try {
       const { data } = await this.apiClient.post<{ total_delivery_price: number; evaluated_stage: number }>(
         '/orders/eval',
-        {
-          vendor_order_id: input.vendorOrderId,
-          origin: [
-            {
-              order: 1,
-              entrance: '0',
-              door_phone: '0',
-              floor: 0,
-              apartment: '0',
-              location: input.origin.location,
-              address: input.origin.address,
-              client: input.origin.client,
-            },
-          ],
-          destination: [
-            {
-              order: 2,
-              entrance: '0',
-              door_phone: '0',
-              floor: 0,
-              apartment: '0',
-              location: input.destination.location,
-              address: input.destination.address,
-              client: input.destination.client,
-              comment: '',
-              products: {
-                type_id: 2,
-                description: 'Sharbat',
-                items: input.items,
-              },
-            },
-          ],
-          payment_type: 'CASH',
-          delivery: {
-            type: 'EXPRESS',
-            time: null,
-            send_link: true,
-            door_to_door: false,
-            product_paid: false,
-            equipment_id: 1,
-          },
-        },
+        this.buildBody(input),
       );
       return data.total_delivery_price ?? null;
     } catch (error) {
@@ -96,53 +55,56 @@ export class DeliveryService {
 
   async createOrder(input: DeliveryCreateOrderInput): Promise<boolean> {
     try {
-      await this.apiClient.post('/orders', {
-        vendor_order_id: input.vendorOrderId,
-        origin: [
-          {
-            order: 1,
-            entrance: '0',
-            door_phone: '0',
-            floor: 0,
-            apartment: '0',
-            location: input.origin.location,
-            address: input.origin.address,
-            client: input.origin.client,
-          },
-        ],
-        destination: [
-          {
-            order: 2,
-            entrance: '0',
-            door_phone: '0',
-            floor: 0,
-            apartment: '0',
-            location: input.destination.location,
-            address: input.destination.address,
-            client: input.destination.client,
-            comment: '',
-            products: {
-              type_id: 2,
-              description: 'Sharbat',
-              items: input.items,
-            },
-          },
-        ],
-        payment_type: 'CASH',
-        delivery: {
-          type: 'EXPRESS',
-          time: null,
-          send_link: true,
-          door_to_door: false,
-          product_paid: false,
-          equipment_id: 1,
-        },
-      });
+      await this.apiClient.post('/orders', this.buildBody(input));
       return true;
     } catch (error) {
       this.logger.error(`createOrder failed for order ${input.vendorOrderId}: ${this.formatError(error)}`);
       return false;
     }
+  }
+
+  private buildBody(input: DeliveryCreateOrderInput) {
+    const products = { type_id: 2, description: 'Sharbat', items: input.items };
+
+    return {
+      vendor_order_id: input.vendorOrderId,
+      origin: [
+        {
+          order: 1,
+          entrance: '0',
+          door_phone: '0',
+          floor: 0,
+          apartment: '0',
+          location: input.origin.location,
+          address: input.origin.address,
+          client: input.origin.client,
+          products,
+        },
+      ],
+      destination: [
+        {
+          order: 2,
+          entrance: '0',
+          door_phone: '0',
+          floor: 0,
+          apartment: '0',
+          location: input.destination.location,
+          address: input.destination.address,
+          client: input.destination.client,
+          comment: '',
+          products,
+        },
+      ],
+      payment_type: 'CASH',
+      delivery: {
+        type: 'EXPRESS',
+        time: null,
+        send_link: true,
+        door_to_door: false,
+        product_paid: false,
+        equipment_id: 1,
+      },
+    };
   }
 
   private formatError(error: unknown): string {

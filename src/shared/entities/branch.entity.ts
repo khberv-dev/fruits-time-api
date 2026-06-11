@@ -23,6 +23,15 @@ export class Branch {
   @Column({ name: 'storage_id', type: 'int', nullable: true, default: null })
   storageId: number | null;
 
+  @Column({ name: 'manager_name', type: 'text', nullable: true, default: null })
+  managerName: string | null;
+
+  @Column({ name: 'manager_phone', type: 'text', nullable: true, default: null })
+  managerPhone: string | null;
+
+  @Column({ name: 'is_working', default: true })
+  isWorking: boolean;
+
   @Column({ name: 'is_active', default: true })
   isActive: boolean;
 

@@ -52,6 +52,9 @@ export class BranchService {
     if (data.long !== undefined) branch.long = data.long;
     if (data.lat !== undefined) branch.lat = data.lat;
     if (data.storageId !== undefined) branch.storageId = data.storageId;
+    if (data.managerName !== undefined) branch.managerName = data.managerName;
+    if (data.managerPhone !== undefined) branch.managerPhone = data.managerPhone;
+    if (data.isWorking !== undefined) branch.isWorking = data.isWorking;
 
     return this.branchRepo.save(branch);
   }

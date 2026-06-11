@@ -1,4 +1,4 @@
-import { IsInt, IsNumber, IsOptional } from 'class-validator';
+import { IsBoolean, IsInt, IsNumber, IsOptional, IsString } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
 export class UpdateBranchRequest {
@@ -16,4 +16,22 @@ export class UpdateBranchRequest {
   @IsOptional()
   @IsInt()
   storageId?: number;
+
+  @ApiPropertyOptional({ example: 'Jasur', description: 'Branch manager name (used as delivery origin contact)' })
+  @IsOptional()
+  @IsString()
+  managerName?: string;
+
+  @ApiPropertyOptional({
+    example: '+998901234567',
+    description: 'Branch manager phone (used as delivery origin contact)',
+  })
+  @IsOptional()
+  @IsString()
+  managerPhone?: string;
+
+  @ApiPropertyOptional({ example: true, description: 'Whether the branch is currently accepting orders' })
+  @IsOptional()
+  @IsBoolean()
+  isWorking?: boolean;
 }

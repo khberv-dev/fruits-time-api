@@ -104,15 +104,23 @@ export class OrderService {
     if (!address) throw new BadRequestException('Manzil topilmadi');
     if (!user) throw new BadRequestException('Foydalanuvchi topilmadi');
 
-    const clientPhone = user.phoneNumber.startsWith('+') ? user.phoneNumber : `+${user.phoneNumber}`;
+    const userPhone = user.phoneNumber.startsWith('+') ? user.phoneNumber : `+${user.phoneNumber}`;
     const cost = await this.deliveryService.evalOrder({
       vendorOrderId: 'eval',
       items: [],
-      origin: { location: { long: branch.long, lat: branch.lat }, address: branch.address, client: { phone: clientPhone, name: user.firstName } },
-      destination: { location: { long: address.long, lat: address.lat }, address: address.name, client: { phone: clientPhone, name: user.firstName } },
+      origin: {
+        location: { long: branch.long, lat: branch.lat },
+        address: branch.address,
+        client: { phone: branch.managerPhone ?? userPhone, name: branch.managerName ?? user.firstName },
+      },
+      destination: {
+        location: { long: address.long, lat: address.lat },
+        address: address.name,
+        client: { phone: userPhone, name: user.firstName },
+      },
     });
 
-    if (cost === null) throw new InternalServerErrorException("Yetkazib berish narxini hisoblashda xatolik");
+    if (cost === null) throw new InternalServerErrorException('Yetkazib berish narxini hisoblashda xatolik');
     return { cost };
   }
 
@@ -131,6 +139,10 @@ export class OrderService {
 
     if (!branch) {
       throw new BadRequestException('Filial topilmadi yoki faol emas');
+    }
+
+    if (!branch.isWorking) {
+      throw new BadRequestException('Filial hozirda buyurtma qabul qilmayapti');
     }
 
     let savedAddress: Address | null = null;
@@ -162,11 +174,16 @@ export class OrderService {
     if (data.type === OrderType.DELIVERY && savedAddress) {
       const user = await this.userRepo.findOne({ where: { id: userId } });
       if (!user) throw new InternalServerErrorException('Foydalanuvchi topilmadi');
-      if (branch.long === null || branch.lat === null) throw new InternalServerErrorException('Filial koordinatalari sozlanmagan');
+      if (branch.long === null || branch.lat === null)
+        throw new InternalServerErrorException('Filial koordinatalari sozlanmagan');
       if (!branch.address) throw new InternalServerErrorException('Filial manzili sozlanmagan');
 
-      const clientPhone = user.phoneNumber.startsWith('+') ? user.phoneNumber : `+${user.phoneNumber}`;
-      const client = { phone: clientPhone, name: user.firstName };
+      const userPhone = user.phoneNumber.startsWith('+') ? user.phoneNumber : `+${user.phoneNumber}`;
+      const originClient = {
+        phone: branch.managerPhone ?? userPhone,
+        name: branch.managerName ?? user.firstName,
+      };
+      const destinationClient = { phone: userPhone, name: user.firstName };
 
       deliveryInput = {
         vendorOrderId: '',
@@ -176,11 +193,18 @@ export class OrderService {
             name: product.getTitle(locale),
             price_per_unit: applyDiscount(product.price, discountPercent),
             quantity: item.quantity,
-            width: 10, height: 10, length: 10, weight: 10,
+            width: 10,
+            height: 10,
+            length: 10,
+            weight: 10,
           };
         }),
-        origin: { location: { long: branch.long, lat: branch.lat }, address: branch.address, client },
-        destination: { location: { long: savedAddress.long, lat: savedAddress.lat }, address: savedAddress.name, client },
+        origin: { location: { long: branch.long, lat: branch.lat }, address: branch.address, client: originClient },
+        destination: {
+          location: { long: savedAddress.long, lat: savedAddress.lat },
+          address: savedAddress.name,
+          client: destinationClient,
+        },
       };
 
       const evaluated = await this.deliveryService.evalOrder({ ...deliveryInput, vendorOrderId: 'eval' });
