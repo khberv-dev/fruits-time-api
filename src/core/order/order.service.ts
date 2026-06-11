@@ -240,7 +240,7 @@ export class OrderService {
       await orderRepo.save(order);
 
       if (data.type === OrderType.DELIVERY && deliveryInput) {
-        await this.sendToDelivery(order, deliveryInput);
+        await this.sendToDelivery(order, { ...deliveryInput, deliveryCost });
       }
 
       return order;
