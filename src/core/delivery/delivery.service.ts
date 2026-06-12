@@ -64,27 +64,16 @@ export class DeliveryService {
   }
 
   private buildBody(input: DeliveryCreateOrderInput) {
-    const extra: typeof input.items = [
-      {
-        name: 'Chegirma',
-        price_per_unit: -(input.discountAmount ?? 0),
-        quantity: 1,
-        width: 0,
-        height: 0,
-        length: 0,
-        weight: 0,
-      },
-      {
-        name: 'Yetkazib berish',
-        price_per_unit: input.deliveryCost ?? 0,
-        quantity: 1,
-        width: 0,
-        height: 0,
-        length: 0,
-        weight: 0,
-      },
-    ];
-    const products = { type_id: 2, description: 'Sharbat', items: [...input.items, ...extra] };
+    const deliveryItem: (typeof input.items)[number] = {
+      name: 'Yetkazib berish',
+      price_per_unit: input.deliveryCost ?? 0,
+      quantity: 1,
+      width: 0,
+      height: 0,
+      length: 0,
+      weight: 0,
+    };
+    const products = { type_id: 2, description: 'Sharbat', items: [...input.items, deliveryItem] };
 
     return {
       vendor_order_id: input.vendorOrderId,
