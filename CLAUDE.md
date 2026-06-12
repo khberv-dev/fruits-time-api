@@ -71,10 +71,15 @@ Three locales (`uz`, `ru`, `en` — `src/shared/enums/locale.enum.ts`). Translat
 
 `OrderService.create` runs inside a single TypeORM transaction:
 1. Saves the `Order` + `OrderItem` rows with `applyDiscount` applied (discount driven by user referral tier).
-2. Calls `PosterService.createOrder` to push the order to the POS; stores the returned `posId` on the order.
-3. If `type === DELIVERY`, calls `DeliveryService.createOrder` (noor.uz API).
+2. Calls `DeliveryService.evalOrder` to get the delivery cost (if `type === DELIVERY`); stores it on the order.
+3. Calls `PosterService.createOrder` to push the order to the POS; stores the returned `posId` on the order.
+4. If `type === DELIVERY`, calls `DeliveryService.createOrder` (noor.uz API).
 
-Any external API failure throws an `InternalServerErrorException` and rolls back the transaction. Both external service methods return `null` on failure; callers check for null and throw rather than propagating the raw error.
+Any external API failure throws an `InternalServerErrorException` and rolls back the transaction. Both external service methods return `null`/`false` on failure; callers check and throw rather than propagating the raw error.
+
+`GET /orders/delivery-cost?branchId=&addressId=` is a pre-check endpoint that calls `DeliveryService.evalOrder` without creating an order, so the client can show the delivery fee before checkout.
+
+`POST /orders/handle` (public, no auth) is a webhook endpoint that receives noor.uz delivery stage callbacks. `OrderService.handleDeliveryWebhook` fires-and-forgets `processDeliveryWebhook`, which maps stages 14/15 → `DONE`, sends an FCM push notification, and ignores unrecognized stages.
 
 ### User referral / status tiers
 
@@ -93,6 +98,7 @@ Three `@Cron` tasks run continuously:
 | `BranchService.syncSpots` | every 10 min | Upserts branches from Poster `spots.getSpots` by `posId` |
 | `ProductService.syncIngredients` | every 5 min | Fetches ingredient IDs per product from `menu.getProduct` |
 | `ProductService.syncAvailability` | every 10 min | Computes per-branch `available[]` from storage leftovers |
+| `OrderService.cancelStaleOrders` | every 5 min | Cancels `CREATED` orders older than 2 hours |
 
 `syncAvailability` depends on `ingredients` being populated by `syncIngredients`. Availability is stored as `jsonb ProductAvailability[]` on `Product` (`{ storage_id, left }`).
 

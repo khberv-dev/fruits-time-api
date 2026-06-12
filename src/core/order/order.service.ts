@@ -81,7 +81,7 @@ export class OrderService {
 
   @Cron(CronExpression.EVERY_5_MINUTES)
   async cancelStaleOrders(): Promise<void> {
-    const cutoff = new Date(Date.now() - 2 * 60 * 60 * 1000);
+    const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
     const { affected } = await this.orderRepo.update(
       { status: OrderStatus.CREATED, createdAt: LessThan(cutoff) },
       { status: OrderStatus.CANCELLED },
