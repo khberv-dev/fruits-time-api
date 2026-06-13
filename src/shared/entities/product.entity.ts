@@ -50,6 +50,9 @@ export class Product {
   @Column({ type: 'jsonb', nullable: true, default: null })
   available: ProductAvailability[] | null;
 
+  @Column({ default: 0 })
+  index: number;
+
   @Column({ name: 'is_active', default: true })
   isActive: boolean;
 

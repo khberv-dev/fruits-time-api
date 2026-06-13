@@ -322,6 +322,29 @@ export class OrderService {
     return orders.map((order) => this.mapOrder(order, locale));
   }
 
+  async listForAdmin(page: number, pageSize: number, locale: Locale) {
+    const [orders, total] = await this.orderRepo.findAndCount({
+      relations: ['items', 'items.product', 'user'],
+      order: { createdAt: 'DESC' },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+    });
+
+    return {
+      data: orders.map((order) => ({
+        ...this.mapOrder(order, locale),
+        user: {
+          id: order.user.id,
+          firstName: order.user.firstName,
+          phoneNumber: order.user.phoneNumber,
+        },
+      })),
+      total,
+      page,
+      pageSize,
+    };
+  }
+
   handleDeliveryWebhook(body: unknown): void {
     this.logger.log(`handle-order webhook: ${JSON.stringify(body)}`);
     this.processDeliveryWebhook(body as DeliveryWebhookBody).catch((err: unknown) => {

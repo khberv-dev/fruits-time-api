@@ -14,7 +14,10 @@ import type { ReqUser } from '@/shared/types/req-user.type';
 import { CreateOrderRequest } from '@/core/order/dto/create-order-request.dto';
 import { DeliveryCostQuery } from '@/core/order/dto/delivery-cost-query.dto';
 import { BasicQuery } from '@/shared/dto/basic-query.dto';
+import { PaginationQuery } from '@/shared/dto/pagination-query.dto';
 import { IsPublic } from '@/common/decorators/is_public.decorator';
+import { Role } from '@/common/decorators/role.decorator';
+import { UserRole } from '@/shared/enums/user-role.enum';
 
 const orderExample = {
   id: '7e9f2d3b-1234-4abc-9d8e-2c4f6a1b3c5d',
@@ -136,6 +139,24 @@ export class OrderController {
   @ApiUnauthorizedResponse({ description: 'Missing or invalid access token' })
   list(@RequestUser() user: ReqUser, @Query() query: BasicQuery) {
     return this.orderService.listForUser(user.id, query.locale);
+  }
+
+  @Get('admin')
+  @Role(UserRole.ADMIN)
+  @ApiOperation({ summary: 'List all orders (admin, newest first, paginated)' })
+  @ApiOkResponse({
+    description: 'Paginated order list with user and item details',
+    schema: {
+      example: {
+        data: [{ ...orderExample, user: { id: 'uuid', firstName: 'Ali', phoneNumber: '+998901234567' } }],
+        total: 42,
+        page: 1,
+        pageSize: 20,
+      },
+    },
+  })
+  listAdmin(@Query() query: PaginationQuery) {
+    return this.orderService.listForAdmin(query.page, query.pageSize, query.locale);
   }
 
   @Post('handle-order')

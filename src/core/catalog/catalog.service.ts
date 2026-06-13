@@ -20,7 +20,7 @@ export class CatalogService {
       qb.where('c.is_active = :isActive', { isActive: true });
     }
 
-    qb.groupBy('c.id');
+    qb.groupBy('c.id').orderBy('c.index', 'ASC');
 
     const { entities: catalogs, raw } = await qb.getRawAndEntities();
 
@@ -59,6 +59,10 @@ export class CatalogService {
 
     if (data.isActive != undefined) {
       catalog.isActive = data.isActive;
+    }
+
+    if (data.index != undefined) {
+      catalog.index = data.index;
     }
 
     return this.catalogRepo.save(catalog);

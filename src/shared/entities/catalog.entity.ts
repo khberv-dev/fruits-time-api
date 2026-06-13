@@ -18,6 +18,9 @@ export class Catalog {
   @OneToMany(() => Product, (product) => product.catalog)
   products: Product[];
 
+  @Column({ default: 0 })
+  index: number;
+
   @Column({ name: 'is_active', default: true })
   isActive: boolean;
 

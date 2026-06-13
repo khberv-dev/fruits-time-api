@@ -80,7 +80,7 @@ export class ProductService {
       qb.where('p.is_active = :isActive', { isActive: true });
     }
 
-    qb.andWhere('p.catalog_id = :catalogId', { catalogId });
+    qb.andWhere('p.catalog_id = :catalogId', { catalogId }).orderBy('p.index', 'ASC');
 
     const products = await qb.getMany();
 
@@ -181,6 +181,10 @@ export class ProductService {
 
     if (data.posId !== undefined) {
       product.posId = data.posId;
+    }
+
+    if (data.index !== undefined) {
+      product.index = data.index;
     }
 
     return this.productRepo.save(product);
