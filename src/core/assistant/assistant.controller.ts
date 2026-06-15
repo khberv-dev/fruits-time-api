@@ -50,6 +50,15 @@ export class AssistantController {
           value: {
             text: 'After a workout, an apple juice helps replenish potassium and offers quick carbohydrates for recovery.',
             suggestions: [productSuggestionExample],
+            cart: [],
+          },
+        },
+        authenticatedWithCart: {
+          summary: 'Authenticated reply with cart (user asked to add products)',
+          value: {
+            text: 'I added apple juice to your cart. You can create an order and show the order number to the cashier, or choose delivery.',
+            suggestions: [productSuggestionExample],
+            cart: ['b1d4ee2c-2e9a-4f12-9a8b-3a4d5e6f7a8b'],
           },
         },
         unauthenticated: {
@@ -58,6 +67,7 @@ export class AssistantController {
             hasAnswer: false,
             text: 'Log in to use chat!',
             suggestions: [],
+            cart: [],
           },
         },
       },
@@ -69,6 +79,7 @@ export class AssistantController {
         hasAnswer: false,
         text: this.requireLoginText[query.locale],
         suggestions: [],
+        cart: [],
       };
     }
 

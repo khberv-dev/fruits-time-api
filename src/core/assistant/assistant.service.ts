@@ -12,8 +12,6 @@ import { MessageRole } from '@/shared/enums/message-role.enum';
 import { User } from '@/shared/entities/user.entity';
 
 const PRODUCTS_TTL_MS = 60_000;
-const SESSION_GAP_MS = 60 * 60 * 1000;
-const SESSION_FETCH_CAP = 200;
 
 @Injectable()
 export class AssistantService implements OnModuleInit {
@@ -44,21 +42,10 @@ export class AssistantService implements OnModuleInit {
   }
 
   private async loadHistory(userId: string): Promise<AssistantMessage[]> {
-    const recent = await this.messageRepo.find({
+    return this.messageRepo.find({
       where: { user: { id: userId } },
-      order: { createdAt: 'DESC' },
-      take: SESSION_FETCH_CAP,
+      order: { createdAt: 'ASC' },
     });
-
-    const session: AssistantMessage[] = [];
-    let cursor: number | null = null;
-    for (const message of recent) {
-      if (cursor !== null && cursor - message.createdAt.getTime() > SESSION_GAP_MS) break;
-      session.push(message);
-      cursor = message.createdAt.getTime();
-    }
-
-    return session.reverse();
   }
 
   async ask(locale: Locale, userId: string, text: string) {
@@ -85,15 +72,16 @@ export class AssistantService implements OnModuleInit {
             hasAnswer: { type: Type.BOOLEAN },
             text: { type: Type.STRING },
             suggestions: { type: Type.ARRAY, items: { type: Type.STRING } },
+            cart: { type: Type.ARRAY, items: { type: Type.STRING } },
           },
-          required: ['hasAnswer', 'text', 'suggestions'],
+          required: ['hasAnswer', 'text', 'suggestions', 'cart'],
         },
       },
     });
 
     const responseText = response.text ?? '{}';
 
-    let message: { hasAnswer?: boolean; text?: string; suggestions?: string[] } = {};
+    let message: { hasAnswer?: boolean; text?: string; suggestions?: string[]; cart?: string[] } = {};
     try {
       message = JSON.parse(responseText);
     } catch {
@@ -107,7 +95,7 @@ export class AssistantService implements OnModuleInit {
 
     const suggestions = this.resolveSuggestions(message.suggestions, products, locale);
 
-    return { text: message.text ?? '', suggestions };
+    return { text: message.text ?? '', suggestions, cart: message.cart ?? [] };
   }
 
   async history(locale: Locale, userId: string) {
@@ -123,9 +111,9 @@ export class AssistantService implements OnModuleInit {
         };
       }
 
-      let parsed: { text?: string; suggestions?: string[] };
+      let parsed: { text?: string; suggestions?: string[]; cart?: string[] };
       try {
-        parsed = JSON.parse(message.text) as { text?: string; suggestions?: string[] };
+        parsed = JSON.parse(message.text) as { text?: string; suggestions?: string[]; cart?: string[] };
       } catch {
         parsed = {};
       }
@@ -135,6 +123,7 @@ export class AssistantService implements OnModuleInit {
         role: message.role,
         text: parsed.text ?? '',
         suggestions: this.resolveSuggestions(parsed.suggestions, products, locale),
+        cart: parsed.cart ?? [],
         createdAt: message.createdAt,
       };
     });
