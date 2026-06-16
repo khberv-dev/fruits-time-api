@@ -32,6 +32,12 @@ export class Branch {
   @Column({ name: 'is_working', default: true })
   isWorking: boolean;
 
+  @Column({ name: 'open_time', type: 'varchar', length: 5, nullable: true, default: null })
+  openTime: string | null;
+
+  @Column({ name: 'close_time', type: 'varchar', length: 5, nullable: true, default: null })
+  closeTime: string | null;
+
   @Column({ name: 'is_active', default: true })
   isActive: boolean;
 

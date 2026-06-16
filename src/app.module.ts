@@ -19,6 +19,7 @@ import { AddressModule } from '@/core/address/address.module';
 import { BranchModule } from '@/core/branch/branch.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { SessionModule } from '@/core/session/session.module';
+import { AdvisorModule } from '@/core/advisor/advisor.module';
 
 @Module({
   imports: [
@@ -44,6 +45,7 @@ import { SessionModule } from '@/core/session/session.module';
     BranchModule,
     StatsModule,
     AssistantModule,
+    AdvisorModule,
     SessionModule,
   ],
   controllers: [AppController],

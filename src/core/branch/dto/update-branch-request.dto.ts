@@ -1,4 +1,4 @@
-import { IsBoolean, IsInt, IsNumber, IsOptional, IsString } from 'class-validator';
+import { IsBoolean, IsInt, IsNumber, IsOptional, IsString, Matches } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
 export class UpdateBranchRequest {
@@ -29,6 +29,18 @@ export class UpdateBranchRequest {
   @IsOptional()
   @IsString()
   managerPhone?: string;
+
+  @ApiPropertyOptional({ example: '09:00', description: 'Opening time in HH:mm format' })
+  @IsOptional()
+  @IsString()
+  @Matches(/^([01]\d|2[0-3]):[0-5]\d$/, { message: 'openTime must be in HH:mm format' })
+  openTime?: string;
+
+  @ApiPropertyOptional({ example: '22:00', description: 'Closing time in HH:mm format' })
+  @IsOptional()
+  @IsString()
+  @Matches(/^([01]\d|2[0-3]):[0-5]\d$/, { message: 'closeTime must be in HH:mm format' })
+  closeTime?: string;
 
   @ApiPropertyOptional({ example: true, description: 'Whether the branch is currently accepting orders' })
   @IsOptional()
