@@ -94,8 +94,9 @@ export class AssistantService implements OnModuleInit {
     ]);
 
     const suggestions = this.resolveSuggestions(message.suggestions, products, locale);
+    const cart = this.resolveCart(message.cart, products);
 
-    return { text: message.text ?? '', suggestions, cart: message.cart ?? [] };
+    return { text: message.text ?? '', suggestions, cart };
   }
 
   async history(locale: Locale, userId: string) {
@@ -123,10 +124,18 @@ export class AssistantService implements OnModuleInit {
         role: message.role,
         text: parsed.text ?? '',
         suggestions: this.resolveSuggestions(parsed.suggestions, products, locale),
-        cart: parsed.cart ?? [],
+        cart: this.resolveCart(parsed.cart, products),
         createdAt: message.createdAt,
       };
     });
+  }
+
+  private resolveCart(ids: string[] | undefined, products: Product[]): string[] {
+    if (!ids?.length) return [];
+    const wanted = new Set(ids);
+    return products
+      .filter((p) => wanted.has(p.id) && p.available?.some((a) => a.left))
+      .map((p) => p.id);
   }
 
   private resolveSuggestions(ids: string[] | undefined, products: Product[], locale: Locale) {

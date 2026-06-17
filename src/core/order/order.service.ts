@@ -145,6 +145,15 @@ export class OrderService {
       throw new BadRequestException('Filial hozirda buyurtma qabul qilmayapti');
     }
 
+    if (branch.storageId !== null) {
+      const unavailable = products.filter((p) => !p.available?.some((a) => a.storage_id === branch.storageId && a.left));
+      if (unavailable.length) {
+        throw new BadRequestException(
+          `Quyidagi mahsulotlar filialda mavjud emas: ${unavailable.map((p) => p.getTitle(locale)).join(', ')}`,
+        );
+      }
+    }
+
     let savedAddress: Address | null = null;
     if (data.addressId) {
       savedAddress = await this.addressRepo.findOne({
