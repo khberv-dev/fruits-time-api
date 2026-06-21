@@ -42,6 +42,8 @@ export class InstructionsService {
       '    * When populating cart, include the IDs of the products you are recommending or',
       '      that are relevant in the current context.',
       '    * In ALL other cases cart must be an empty array [].',
+      '  - When suggestions is non-empty, end your text with a short friendly question asking',
+      '    the user if they would like to add the suggested products to their cart.',
       '',
       "Answer in the same language as the user's question.",
       `Products: ${JSON.stringify(productPayload)}`,

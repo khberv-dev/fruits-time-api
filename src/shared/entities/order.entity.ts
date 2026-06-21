@@ -13,6 +13,7 @@ import { OrderItem } from '@/shared/entities/order-item.entity';
 import { OrderStatus } from '@/shared/enums/order-status.enum';
 import { OrderType } from '@/shared/enums/order-type.enum';
 import { Coordinates } from '@/shared/types/coordinates.type';
+import { DeliveryCreateOrderInput } from '@/core/delivery/types/delivery-create-order-input.type';
 
 @Entity('orders')
 export class Order {
@@ -37,6 +38,9 @@ export class Order {
 
   @Column({ name: 'delivery_cost', type: 'int', nullable: true, default: null })
   deliveryCost: number | null;
+
+  @Column({ name: 'delivery_payload', type: 'jsonb', nullable: true, default: null })
+  deliveryPayload: DeliveryCreateOrderInput | null;
 
   @Column({ type: 'text', nullable: true, default: null })
   link: string | null;

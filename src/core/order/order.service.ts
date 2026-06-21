@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { In, LessThan, Repository } from 'typeorm';
+import { In, IsNull, LessThan, MoreThan, Not, Repository } from 'typeorm';
 import { Order } from '@/shared/entities/order.entity';
 import { Product } from '@/shared/entities/product.entity';
 import { User } from '@/shared/entities/user.entity';
@@ -247,11 +247,12 @@ export class OrderService {
 
       order.posId = await this.sendToPoster(userId, products, data, branch.posId, discountPercent, deliveryCost);
       order.deliveryCost = deliveryCost ?? null;
-      await orderRepo.save(order);
 
       if (data.type === OrderType.DELIVERY && deliveryInput) {
-        await this.sendToDelivery(order, { ...deliveryInput, deliveryCost });
+        order.deliveryPayload = { ...deliveryInput, vendorOrderId: order.id, deliveryCost };
       }
+
+      await orderRepo.save(order);
 
       return order;
     });
@@ -259,10 +260,46 @@ export class OrderService {
     return this.mapOrder(order, locale);
   }
 
-  private async sendToDelivery(order: Order, input: DeliveryCreateOrderInput): Promise<void> {
-    const ok = await this.deliveryService.createOrder({ ...input, vendorOrderId: order.id });
-    if (!ok) {
-      throw new InternalServerErrorException("Yetkazib berish xizmatiga buyurtma yuborib bo'lmadi");
+  @Cron(CronExpression.EVERY_MINUTE)
+  async dispatchPendingDeliveries(): Promise<void> {
+    const cutoff = new Date(Date.now() - 10 * 60 * 1000);
+
+    // Clear payload for orders that missed the acceptance window
+    await this.orderRepo
+      .createQueryBuilder()
+      .update()
+      .set({ deliveryPayload: () => 'NULL' })
+      .where(
+        'type = :type AND status = :status AND delivery_payload IS NOT NULL AND created_at < :cutoff',
+        { type: OrderType.DELIVERY, status: OrderStatus.CREATED, cutoff },
+      )
+      .execute();
+
+    const pending = await this.orderRepo.find({
+      where: {
+        type: OrderType.DELIVERY,
+        status: OrderStatus.CREATED,
+        deliveryPayload: Not(IsNull()),
+        createdAt: MoreThan(cutoff),
+      },
+    });
+
+    if (!pending.length) return;
+
+    const dateFrom = new Date(Date.now() - 15 * 60 * 1000);
+    const acceptedIds = await this.posterService.getTransactions(dateFrom);
+    const accepted = new Set(acceptedIds);
+
+    for (const order of pending) {
+      if (order.posId === null || !accepted.has(order.posId)) continue;
+
+      const ok = await this.deliveryService.createOrder(order.deliveryPayload!);
+      if (ok) {
+        await this.orderRepo.update(order.id, { deliveryPayload: null });
+        this.logger.log(`dispatchPendingDeliveries: dispatched delivery for order ${order.id}`);
+      } else {
+        this.logger.error(`dispatchPendingDeliveries: delivery dispatch failed for order ${order.id}`);
+      }
     }
   }
 

@@ -155,6 +155,26 @@ export class PosterService {
     }
   }
 
+  async getTransactions(dateFrom: Date): Promise<number[]> {
+    try {
+      const formatted = dateFrom.toISOString().replace('T', ' ').slice(0, 19);
+      const { data } = await this.apiClient.get<PosterResponse<{ data: { transaction_id: number }[] }>>(
+        '/transactions.getTransactions',
+        { params: { date_from: formatted } },
+      );
+
+      if (data.error !== undefined && data.error !== 0) {
+        this.logger.error(`getTransactions failed: [${JSON.stringify(data.error)}]`);
+        return [];
+      }
+
+      return (data.response?.data ?? []).map((t) => t.transaction_id);
+    } catch (error) {
+      this.logger.error(`getTransactions failed: ${this.formatError(error)}`);
+      return [];
+    }
+  }
+
   async getProduct(productId: number): Promise<number[] | null> {
     try {
       const { data } = await this.apiClient.get<
