@@ -282,6 +282,7 @@ export class OrderService {
         deliveryPayload: Not(IsNull()),
         createdAt: MoreThan(cutoff),
       },
+      relations: ['user'],
     });
 
     if (!pending.length) return;
@@ -292,6 +293,11 @@ export class OrderService {
 
     for (const order of pending) {
       if (order.posId === null || !accepted.has(order.posId)) continue;
+
+      const session = await this.sessionRepo.findOne({ where: { user: { id: order.user.id } } });
+      if (session?.fcmToken) {
+        await this.pushService.send(session.fcmToken, 'Fruits Time', 'Buyurtmangiz qabul qilindi');
+      }
 
       const ok = await this.deliveryService.createOrder(order.deliveryPayload!);
       if (ok) {
