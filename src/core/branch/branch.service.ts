@@ -55,6 +55,8 @@ export class BranchService {
     if (data.managerName !== undefined) branch.managerName = data.managerName;
     if (data.managerPhone !== undefined) branch.managerPhone = data.managerPhone;
     if (data.isWorking !== undefined) branch.isWorking = data.isWorking;
+    if (data.openTime !== undefined) branch.openTime = data.openTime;
+    if (data.closeTime !== undefined) branch.closeTime = data.closeTime;
 
     return this.branchRepo.save(branch);
   }
