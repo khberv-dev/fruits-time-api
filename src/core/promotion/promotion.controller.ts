@@ -11,6 +11,8 @@ import { PromotionService } from '@/core/promotion/promotion.service';
 import { Role } from '@/common/decorators/role.decorator';
 import { UserRole } from '@/shared/enums/user-role.enum';
 import { UpdatePromotionRequest } from '@/core/promotion/dto/update-promotion-request.dto';
+import { RequestUser } from '@/common/decorators/request-user.decorator';
+import type { ReqUser } from '@/shared/types/req-user.type';
 
 const promotionExample = {
   id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
@@ -20,10 +22,27 @@ const promotionExample = {
   updatedAt: '2025-06-01T00:00:00.000Z',
 };
 
+const loyaltyStatusExample = {
+  isActive: true,
+  itemsOrdered: 7,
+  itemsUntilNextFree: 3,
+};
+
 @ApiTags('Promotion')
 @Controller('promotion')
 export class PromotionController {
   constructor(private readonly promotionService: PromotionService) {}
+
+  @Get('loyalty-status')
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: "Get the authenticated user's loyalty promotion progress" })
+  @ApiOkResponse({
+    description: 'Whether the loyalty promotion is enabled and how many items remain until the next free one',
+    schema: { example: loyaltyStatusExample },
+  })
+  getLoyaltyStatus(@RequestUser() user: ReqUser) {
+    return this.promotionService.getLoyaltyStatus(user.id);
+  }
 
   @Get()
   @Role(UserRole.ADMIN)

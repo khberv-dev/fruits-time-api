@@ -177,13 +177,29 @@ export class OrderService {
     const referralCount = await this.userRepo.count({ where: { referredBy: { id: userId } } });
     const discountPercent = getStatusDiscount(computeUserStatus(referralCount));
 
-    const isFirstOrder = (await this.orderRepo.count({ where: { user: { id: userId } } })) === 0;
-    const itemDiscounts = await this.promotionService.computeItemDiscounts({
-      isFirstOrder,
-      itemCount: data.items.length,
-    });
-    const promoDiscountByIndex = new Map(itemDiscounts.map((d) => [d.itemIndex, d.discountPercent]));
-    const getItemDiscountPercent = (index: number) => Math.max(discountPercent, promoDiscountByIndex.get(index) ?? 0);
+    const itemDiscounts = await this.promotionService.computeItemDiscounts(
+      userId,
+      data.items.map((item) => item.quantity),
+    );
+    const promoByIndex = new Map<number, { freeUnits: number; discountPercent: number }>();
+    for (const d of itemDiscounts) {
+      const existing = promoByIndex.get(d.itemIndex) ?? { freeUnits: 0, discountPercent: 0 };
+      promoByIndex.set(d.itemIndex, {
+        freeUnits: existing.freeUnits + (d.freeUnits ?? 0),
+        discountPercent: Math.max(existing.discountPercent, d.discountPercent ?? 0),
+      });
+    }
+
+    // Combines the referral-tier discount with any promotion for this line: promo-free
+    // units are dropped from the billable quantity, remaining units get the better discount.
+    const getItemLinePrice = (index: number, unitPrice: number, quantity: number): number => {
+      const promo = promoByIndex.get(index);
+      const paidQuantity = Math.max(quantity - (promo?.freeUnits ?? 0), 0);
+      const itemDiscountPercent = Math.max(discountPercent, promo?.discountPercent ?? 0);
+      return applyDiscount(unitPrice * paidQuantity, itemDiscountPercent);
+    };
+    const getItemUnitPrice = (index: number, unitPrice: number, quantity: number): number =>
+      quantity > 0 ? Math.round(getItemLinePrice(index, unitPrice, quantity) / quantity) : 0;
 
     const productById = new Map(products.map((product) => [product.id, product]));
 
@@ -210,7 +226,7 @@ export class OrderService {
           const product = productById.get(item.productId)!;
           return {
             name: product.getTitle(locale),
-            price_per_unit: applyDiscount(product.price, getItemDiscountPercent(index)),
+            price_per_unit: getItemUnitPrice(index, product.price, item.quantity),
             quantity: item.quantity,
             width: 10,
             height: 10,
@@ -240,11 +256,12 @@ export class OrderService {
         type: data.type,
         address: addressSnapshot,
         items: data.items.map((item, index) => {
-          const lineTotal = productById.get(item.productId)!.price * item.quantity;
+          const product = productById.get(item.productId)!;
+          const lineTotal = product.price * item.quantity;
           return {
             product: { id: item.productId } as Product,
             quantity: item.quantity,
-            price: applyDiscount(lineTotal, getItemDiscountPercent(index)),
+            price: getItemLinePrice(index, product.price, item.quantity),
             actualPrice: lineTotal,
           };
         }),
@@ -255,7 +272,7 @@ export class OrderService {
         relations: ['items', 'items.product'],
       });
 
-      order.posId = await this.sendToPoster(userId, products, data, branch.posId, getItemDiscountPercent, deliveryCost);
+      order.posId = await this.sendToPoster(userId, products, data, branch.posId, getItemUnitPrice, deliveryCost);
       order.deliveryCost = deliveryCost ?? null;
 
       if (data.type === OrderType.DELIVERY && deliveryInput) {
@@ -324,7 +341,7 @@ export class OrderService {
     products: Product[],
     data: CreateOrderRequest,
     spotId: number,
-    getItemDiscountPercent: (index: number) => number,
+    getItemUnitPrice: (index: number, unitPrice: number, quantity: number) => number,
     deliveryCost?: number,
   ): Promise<number> {
     const user = await this.userRepo.findOne({ where: { id: userId } });
@@ -345,7 +362,7 @@ export class OrderService {
       posterProducts.push({
         id: product.posId,
         count: item.quantity,
-        price: applyDiscount(product.price, getItemDiscountPercent(index)),
+        price: getItemUnitPrice(index, product.price, item.quantity),
       });
     }
 
