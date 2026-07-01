@@ -22,4 +22,12 @@ export class CreateBannerRequest {
   })
   @IsOptional()
   file: any;
+
+  @ApiPropertyOptional({
+    type: 'string',
+    format: 'binary',
+    description: 'Banner thumbnail (multipart upload)',
+  })
+  @IsOptional()
+  thumbnail: any;
 }

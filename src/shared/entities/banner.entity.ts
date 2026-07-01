@@ -11,6 +11,9 @@ export class Banner {
   @Column({ type: 'jsonb', default: {} })
   image: Localized<string>;
 
+  @Column({ type: 'jsonb', nullable: true, default: null })
+  thumbnail: Localized<string> | null;
+
   @Column({ type: 'jsonb', default: {} })
   title: Localized<string>;
 
@@ -36,5 +39,13 @@ export class Banner {
 
   getImage(locale: Locale): string {
     return this.image[locale] ?? getObjectDefaultValue(this.image, '');
+  }
+
+  getThumbnail(locale: Locale): string | null {
+    if (!this.thumbnail) {
+      return null;
+    }
+
+    return this.thumbnail[locale] ?? getObjectDefaultValue(this.thumbnail, null);
   }
 }

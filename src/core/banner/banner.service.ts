@@ -23,18 +23,26 @@ export class BannerService {
       title: banner.getTitle(locale),
       content: banner.getContent(locale),
       image: banner.getImage(locale),
+      thumbnail: banner.getThumbnail(locale),
     }));
   }
 
-  create(locale: Locale, fileName: string, data: CreateBannerRequest) {
+  create(locale: Locale, fileName: string, thumbnailFileName: string | null, data: CreateBannerRequest) {
     return this.bannerRepo.save({
       title: { [locale]: data.title },
       content: { [locale]: data.content },
       image: { [locale]: fileName },
+      thumbnail: thumbnailFileName ? { [locale]: thumbnailFileName } : null,
     });
   }
 
-  async update(bannerId: string, locale: Locale, fileName: string | null, data: UpdateBannerRequest) {
+  async update(
+    bannerId: string,
+    locale: Locale,
+    fileName: string | null,
+    thumbnailFileName: string | null,
+    data: UpdateBannerRequest,
+  ) {
     const banner = await this.bannerRepo.findOne({
       where: {
         id: bannerId,
@@ -47,6 +55,10 @@ export class BannerService {
 
     if (fileName) {
       banner.image = { ...banner.image, [locale]: fileName };
+    }
+
+    if (thumbnailFileName) {
+      banner.thumbnail = { ...banner.thumbnail, [locale]: thumbnailFileName };
     }
 
     if (data.title) {
