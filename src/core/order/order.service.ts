@@ -19,6 +19,7 @@ import { OrderStatus } from '@/shared/enums/order-status.enum';
 import { computeUserStatus, getStatusDiscount } from '@/core/user/user.service';
 import { DeliveryCreateOrderInput } from '@/core/delivery/types/delivery-create-order-input.type';
 import { DeliveryWebhookBody } from '@/core/delivery/types/delivery-webhook-body.type';
+import { PromotionService } from '@/core/promotion/promotion.service';
 
 const DELIVERY_STAGE_MESSAGE: Record<number, string> = {
   1: 'Buyurtmangiz qabul qilindi',
@@ -77,6 +78,7 @@ export class OrderService {
     private readonly posterService: PosterService,
     private readonly deliveryService: DeliveryService,
     private readonly pushService: PushService,
+    private readonly promotionService: PromotionService,
   ) {}
 
   @Cron(CronExpression.EVERY_5_MINUTES)
@@ -175,6 +177,14 @@ export class OrderService {
     const referralCount = await this.userRepo.count({ where: { referredBy: { id: userId } } });
     const discountPercent = getStatusDiscount(computeUserStatus(referralCount));
 
+    const isFirstOrder = (await this.orderRepo.count({ where: { user: { id: userId } } })) === 0;
+    const itemDiscounts = await this.promotionService.computeItemDiscounts({
+      isFirstOrder,
+      itemCount: data.items.length,
+    });
+    const promoDiscountByIndex = new Map(itemDiscounts.map((d) => [d.itemIndex, d.discountPercent]));
+    const getItemDiscountPercent = (index: number) => Math.max(discountPercent, promoDiscountByIndex.get(index) ?? 0);
+
     const productById = new Map(products.map((product) => [product.id, product]));
 
     let deliveryInput: DeliveryCreateOrderInput | null = null;
@@ -196,11 +206,11 @@ export class OrderService {
 
       deliveryInput = {
         vendorOrderId: '',
-        items: data.items.map((item) => {
+        items: data.items.map((item, index) => {
           const product = productById.get(item.productId)!;
           return {
             name: product.getTitle(locale),
-            price_per_unit: applyDiscount(product.price, discountPercent),
+            price_per_unit: applyDiscount(product.price, getItemDiscountPercent(index)),
             quantity: item.quantity,
             width: 10,
             height: 10,
@@ -229,12 +239,12 @@ export class OrderService {
         user: { id: userId } as User,
         type: data.type,
         address: addressSnapshot,
-        items: data.items.map((item) => {
+        items: data.items.map((item, index) => {
           const lineTotal = productById.get(item.productId)!.price * item.quantity;
           return {
             product: { id: item.productId } as Product,
             quantity: item.quantity,
-            price: applyDiscount(lineTotal, discountPercent),
+            price: applyDiscount(lineTotal, getItemDiscountPercent(index)),
             actualPrice: lineTotal,
           };
         }),
@@ -245,7 +255,7 @@ export class OrderService {
         relations: ['items', 'items.product'],
       });
 
-      order.posId = await this.sendToPoster(userId, products, data, branch.posId, discountPercent, deliveryCost);
+      order.posId = await this.sendToPoster(userId, products, data, branch.posId, getItemDiscountPercent, deliveryCost);
       order.deliveryCost = deliveryCost ?? null;
 
       if (data.type === OrderType.DELIVERY && deliveryInput) {
@@ -314,7 +324,7 @@ export class OrderService {
     products: Product[],
     data: CreateOrderRequest,
     spotId: number,
-    discountPercent: number,
+    getItemDiscountPercent: (index: number) => number,
     deliveryCost?: number,
   ): Promise<number> {
     const user = await this.userRepo.findOne({ where: { id: userId } });
@@ -326,7 +336,7 @@ export class OrderService {
     const productById = new Map(products.map((product) => [product.id, product]));
     const posterProducts: { id: number; count: number; price?: number }[] = [];
 
-    for (const item of data.items) {
+    for (const [index, item] of data.items.entries()) {
       const product = productById.get(item.productId);
       if (!product?.posId) {
         this.logger.error(`POS order rejected: product ${item.productId} has no posId`);
@@ -335,7 +345,7 @@ export class OrderService {
       posterProducts.push({
         id: product.posId,
         count: item.quantity,
-        price: applyDiscount(product.price, discountPercent),
+        price: applyDiscount(product.price, getItemDiscountPercent(index)),
       });
     }
 

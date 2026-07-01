@@ -12,6 +12,7 @@ import { Session } from '@/shared/entities/session.entity';
 import { PosterModule } from '@/core/poster/poster.module';
 import { DeliveryModule } from '@/core/delivery/delivery.module';
 import { NotifyModule } from '@/core/notify/notify.module';
+import { PromotionModule } from '@/core/promotion/promotion.module';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { NotifyModule } from '@/core/notify/notify.module';
     PosterModule,
     DeliveryModule,
     NotifyModule,
+    PromotionModule,
   ],
   controllers: [OrderController],
   providers: [OrderService],

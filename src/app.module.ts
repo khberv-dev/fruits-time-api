@@ -20,6 +20,7 @@ import { BranchModule } from '@/core/branch/branch.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { SessionModule } from '@/core/session/session.module';
 import { AdvisorModule } from '@/core/advisor/advisor.module';
+import { PromotionModule } from '@/core/promotion/promotion.module';
 
 @Module({
   imports: [
@@ -47,6 +48,7 @@ import { AdvisorModule } from '@/core/advisor/advisor.module';
     AssistantModule,
     AdvisorModule,
     SessionModule,
+    PromotionModule,
   ],
   controllers: [AppController],
   providers: [
