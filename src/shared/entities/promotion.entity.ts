@@ -12,6 +12,10 @@ export class Promotion {
   @Column({ name: 'is_active', default: true })
   isActive: boolean;
 
+  // Only used by promotions scoped to specific products (e.g. buy-two-get-one-free).
+  @Column({ name: 'product_ids', type: 'jsonb', nullable: true, default: null })
+  productIds: string[] | null;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

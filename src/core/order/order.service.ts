@@ -19,7 +19,9 @@ import { OrderStatus } from '@/shared/enums/order-status.enum';
 import { computeUserStatus, getStatusDiscount } from '@/core/user/user.service';
 import { DeliveryCreateOrderInput } from '@/core/delivery/types/delivery-create-order-input.type';
 import { DeliveryWebhookBody } from '@/core/delivery/types/delivery-webhook-body.type';
-import { PromotionService } from '@/core/promotion/promotion.service';
+import { DeliveryDiscount, ItemDiscount, PromotionService } from '@/core/promotion/promotion.service';
+import { PromotionType } from '@/shared/enums/promotion-type.enum';
+import { CreateOrderItem } from '@/core/order/dto/create-order-request.dto';
 
 const DELIVERY_STAGE_MESSAGE: Record<number, string> = {
   1: 'Buyurtmangiz qabul qilindi',
@@ -60,6 +62,57 @@ function stageToOrderStatus(stage: number): OrderStatus | null {
 
 function applyDiscount(price: number, discountPercent: number): number {
   return Math.round(price * (1 - discountPercent / 100));
+}
+
+interface PromoAggregate {
+  freeUnits: number;
+  freeUnitsType: PromotionType | null;
+  discountPercent: number;
+  discountPercentType: PromotionType | null;
+}
+
+// Multiple promotions can target the same line (e.g. a first order of 10+ units of one
+// product hits both the first-order and loyalty promos), so free units and the percent
+// discount are tracked separately, each keeping the type that "won" it.
+function aggregatePromoByIndex(itemDiscounts: ItemDiscount[]): Map<number, PromoAggregate> {
+  const map = new Map<number, PromoAggregate>();
+
+  for (const d of itemDiscounts) {
+    const existing = map.get(d.itemIndex) ?? {
+      freeUnits: 0,
+      freeUnitsType: null,
+      discountPercent: 0,
+      discountPercentType: null,
+    };
+
+    if (d.freeUnits) {
+      existing.freeUnits += d.freeUnits;
+      existing.freeUnitsType = d.type;
+    }
+    if (d.discountPercent && d.discountPercent > existing.discountPercent) {
+      existing.discountPercent = d.discountPercent;
+      existing.discountPercentType = d.type;
+    }
+
+    map.set(d.itemIndex, existing);
+  }
+
+  return map;
+}
+
+interface PreparedOrder {
+  branch: Branch;
+  products: Product[];
+  productById: Map<string, Product>;
+  savedAddress: Address | null;
+  addressSnapshot: Coordinates | null;
+  discountPercent: number;
+  promoByIndex: Map<number, PromoAggregate>;
+  getItemLinePrice: (index: number, unitPrice: number, quantity: number) => number;
+  getItemUnitPrice: (index: number, unitPrice: number, quantity: number) => number;
+  deliveryInput: DeliveryCreateOrderInput | null;
+  deliveryCost?: number;
+  deliveryDiscount: DeliveryDiscount | null;
 }
 
 const POSTER_DELIVERY_BASE = { courierId: 1, processingStatus: 40 };
@@ -126,10 +179,102 @@ export class OrderService {
     return { cost };
   }
 
+  async evaluate(userId: string, locale: Locale, data: CreateOrderRequest) {
+    const prepared = await this.prepareOrder(userId, locale, data);
+    const { productById, discountPercent, promoByIndex, getItemLinePrice, deliveryCost, deliveryDiscount } = prepared;
+
+    let subtotal = 0;
+    let total = 0;
+
+    const items = data.items.map((item, index) => {
+      const product = productById.get(item.productId)!;
+      const lineTotal = product.price * item.quantity;
+      const price = getItemLinePrice(index, product.price, item.quantity);
+      subtotal += lineTotal;
+      total += price;
+
+      return {
+        productId: product.id,
+        title: product.getTitle(locale),
+        quantity: item.quantity,
+        unitPrice: product.price,
+        lineTotal,
+        price,
+      };
+    });
+
+    const discounts = this.buildDiscountBreakdown(data.items, productById, promoByIndex, discountPercent);
+    if (deliveryDiscount) discounts.push(deliveryDiscount);
+
+    return {
+      items,
+      subtotal,
+      discounts,
+      discountTotal: subtotal - total,
+      deliveryCost: deliveryCost ?? null,
+      total: total + (deliveryCost ?? 0),
+    };
+  }
+
   async create(userId: string, locale: Locale, data: CreateOrderRequest) {
     const activeOrder = await this.orderRepo.findOne({ where: { user: { id: userId }, status: OrderStatus.CREATED } });
     if (activeOrder) throw new BadRequestException('Sizda allaqachon faol buyurtma mavjud');
 
+    const {
+      branch,
+      products,
+      productById,
+      addressSnapshot,
+      deliveryInput,
+      deliveryCost,
+      getItemLinePrice,
+      getItemUnitPrice,
+    } = await this.prepareOrder(userId, locale, data);
+
+    // Save the order, call POS, and (if delivery) call the delivery service in
+    // a single transaction so any external failure rolls back the DB row.
+    const order = await this.orderRepo.manager.transaction(async (manager) => {
+      const orderRepo = manager.getRepository(Order);
+
+      const inserted = await orderRepo.save({
+        user: { id: userId } as User,
+        type: data.type,
+        address: addressSnapshot,
+        items: data.items.map((item, index) => {
+          const product = productById.get(item.productId)!;
+          const lineTotal = product.price * item.quantity;
+          return {
+            product: { id: item.productId } as Product,
+            quantity: item.quantity,
+            price: getItemLinePrice(index, product.price, item.quantity),
+            actualPrice: lineTotal,
+          };
+        }),
+      });
+
+      const order = await orderRepo.findOneOrFail({
+        where: { id: inserted.id },
+        relations: ['items', 'items.product'],
+      });
+
+      order.posId = await this.sendToPoster(userId, products, data, branch.posId, getItemUnitPrice, deliveryCost);
+      order.deliveryCost = deliveryCost ?? null;
+
+      if (data.type === OrderType.DELIVERY && deliveryInput) {
+        order.deliveryPayload = { ...deliveryInput, vendorOrderId: order.id, deliveryCost };
+      }
+
+      await orderRepo.save(order);
+
+      return order;
+    });
+
+    return this.mapOrder(order, locale);
+  }
+
+  // Shared by create() and evaluate(): validates the branch/products/address and
+  // computes per-line pricing (referral-tier + promotion discounts, delivery quote).
+  private async prepareOrder(userId: string, locale: Locale, data: CreateOrderRequest): Promise<PreparedOrder> {
     const productIds = [...new Set(data.items.map((item) => item.productId))];
 
     const products = await this.productRepo.find({ where: { id: In(productIds), isActive: true } });
@@ -177,18 +322,8 @@ export class OrderService {
     const referralCount = await this.userRepo.count({ where: { referredBy: { id: userId } } });
     const discountPercent = getStatusDiscount(computeUserStatus(referralCount));
 
-    const itemDiscounts = await this.promotionService.computeItemDiscounts(
-      userId,
-      data.items.map((item) => item.quantity),
-    );
-    const promoByIndex = new Map<number, { freeUnits: number; discountPercent: number }>();
-    for (const d of itemDiscounts) {
-      const existing = promoByIndex.get(d.itemIndex) ?? { freeUnits: 0, discountPercent: 0 };
-      promoByIndex.set(d.itemIndex, {
-        freeUnits: existing.freeUnits + (d.freeUnits ?? 0),
-        discountPercent: Math.max(existing.discountPercent, d.discountPercent ?? 0),
-      });
-    }
+    const itemDiscounts = await this.promotionService.computeItemDiscounts(userId, data.items);
+    const promoByIndex = aggregatePromoByIndex(itemDiscounts);
 
     // Combines the referral-tier discount with any promotion for this line: promo-free
     // units are dropped from the billable quantity, remaining units get the better discount.
@@ -205,6 +340,7 @@ export class OrderService {
 
     let deliveryInput: DeliveryCreateOrderInput | null = null;
     let deliveryCost: number | undefined;
+    let deliveryDiscount: DeliveryDiscount | null = null;
 
     if (data.type === OrderType.DELIVERY && savedAddress) {
       const user = await this.userRepo.findOne({ where: { id: userId } });
@@ -244,47 +380,80 @@ export class OrderService {
 
       const evaluated = await this.deliveryService.evalOrder({ ...deliveryInput, vendorOrderId: 'eval' });
       deliveryCost = evaluated ?? undefined;
+
+      // "3km free delivery": flat amount off the quote, floored at 0 rather than going negative.
+      if (deliveryCost !== undefined) {
+        const discount = await this.promotionService.getDeliveryDiscount();
+        if (discount) {
+          const amount = Math.min(deliveryCost, discount.amount);
+          deliveryCost -= amount;
+          deliveryDiscount = { name: discount.name, amount };
+        }
+      }
     }
 
-    // Save the order, call POS, and (if delivery) call the delivery service in
-    // a single transaction so any external failure rolls back the DB row.
-    const order = await this.orderRepo.manager.transaction(async (manager) => {
-      const orderRepo = manager.getRepository(Order);
+    return {
+      branch,
+      products,
+      productById,
+      savedAddress,
+      addressSnapshot,
+      discountPercent,
+      promoByIndex,
+      getItemLinePrice,
+      getItemUnitPrice,
+      deliveryInput,
+      deliveryCost,
+      deliveryDiscount,
+    };
+  }
 
-      const inserted = await orderRepo.save({
-        user: { id: userId } as User,
-        type: data.type,
-        address: addressSnapshot,
-        items: data.items.map((item, index) => {
-          const product = productById.get(item.productId)!;
-          const lineTotal = product.price * item.quantity;
-          return {
-            product: { id: item.productId } as Product,
-            quantity: item.quantity,
-            price: getItemLinePrice(index, product.price, item.quantity),
-            actualPrice: lineTotal,
-          };
-        }),
-      });
+  // Attributes the money saved per line to the discount that produced it (referral tier
+  // vs. a specific promotion), so evaluate() can show the user a "name + amount" breakdown.
+  private buildDiscountBreakdown(
+    items: CreateOrderItem[],
+    productById: Map<string, Product>,
+    promoByIndex: Map<number, PromoAggregate>,
+    discountPercent: number,
+  ): { name: string; amount: number }[] {
+    let statusAmount = 0;
+    const promoAmountByType = new Map<PromotionType, number>();
 
-      const order = await orderRepo.findOneOrFail({
-        where: { id: inserted.id },
-        relations: ['items', 'items.product'],
-      });
+    items.forEach((item, index) => {
+      const product = productById.get(item.productId)!;
+      const promo = promoByIndex.get(index);
+      const freeUnits = Math.min(promo?.freeUnits ?? 0, item.quantity);
+      const paidQuantity = item.quantity - freeUnits;
 
-      order.posId = await this.sendToPoster(userId, products, data, branch.posId, getItemUnitPrice, deliveryCost);
-      order.deliveryCost = deliveryCost ?? null;
-
-      if (data.type === OrderType.DELIVERY && deliveryInput) {
-        order.deliveryPayload = { ...deliveryInput, vendorOrderId: order.id, deliveryCost };
+      if (freeUnits > 0 && promo?.freeUnitsType) {
+        const type = promo.freeUnitsType;
+        promoAmountByType.set(type, (promoAmountByType.get(type) ?? 0) + freeUnits * product.price);
       }
 
-      await orderRepo.save(order);
+      const promoPercent = promo?.discountPercent ?? 0;
+      const appliedPercent = Math.max(discountPercent, promoPercent);
+      if (appliedPercent === 0 || paidQuantity === 0) return;
 
-      return order;
+      const paidLineTotal = product.price * paidQuantity;
+      const percentAmount = paidLineTotal - applyDiscount(paidLineTotal, appliedPercent);
+
+      if (promoPercent > discountPercent && promo?.discountPercentType) {
+        const type = promo.discountPercentType;
+        promoAmountByType.set(type, (promoAmountByType.get(type) ?? 0) + percentAmount);
+      } else {
+        statusAmount += percentAmount;
+      }
     });
 
-    return this.mapOrder(order, locale);
+    const discounts: { name: string; amount: number }[] = [];
+    if (statusAmount > 0) {
+      discounts.push({ name: 'Referal dasturi chegirmasi', amount: statusAmount });
+    }
+    for (const [type, amount] of promoAmountByType) {
+      if (amount > 0) discounts.push({ name: this.promotionService.getDisplayName(type), amount });
+    }
+
+    return discounts;
   }
 
   @Cron(CronExpression.EVERY_MINUTE)

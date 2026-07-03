@@ -18,6 +18,7 @@ const promotionExample = {
   id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
   type: 'first_order_first_item',
   isActive: true,
+  productIds: null,
   createdAt: '2025-06-01T00:00:00.000Z',
   updatedAt: '2025-06-01T00:00:00.000Z',
 };
@@ -57,11 +58,15 @@ export class PromotionController {
   @Patch(':id')
   @Role(UserRole.ADMIN)
   @ApiBearerAuth('access-token')
-  @ApiOperation({ summary: 'Enable or disable a promotion (admin only)' })
+  @ApiOperation({
+    summary: 'Enable/disable a promotion, or set its eligible products (admin only)',
+    description:
+      '`productIds` only applies to product-scoped promotions (e.g. buy-two-get-one-free) and is ignored otherwise.',
+  })
   @ApiOkResponse({ description: 'Updated promotion', schema: { example: promotionExample } })
   @ApiNotFoundResponse({ description: 'Promotion not found' })
   @ApiForbiddenResponse({ description: 'Caller is not an admin' })
   update(@Param('id', ParseUUIDPipe) id: string, @Body() body: UpdatePromotionRequest) {
-    return this.promotionService.setActive(id, body.isActive);
+    return this.promotionService.update(id, body);
   }
 }

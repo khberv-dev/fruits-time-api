@@ -47,6 +47,24 @@ const orderExample = {
   ],
 };
 
+const evaluateOrderExample = {
+  items: [
+    {
+      productId: 'b1d4ee2c-2e9a-4f12-9a8b-3a4d5e6f7a8b',
+      title: 'Apple Juice',
+      quantity: 2,
+      unitPrice: 25000,
+      lineTotal: 50000,
+      price: 35000,
+    },
+  ],
+  subtotal: 50000,
+  discounts: [{ name: 'Birinchi buyurtma uchun chegirma', amount: 15000 }],
+  discountTotal: 15000,
+  deliveryCost: 12000,
+  total: 47000,
+};
+
 const orderExample2 = {
   id: '0c2a1e8b-9d33-4f56-87ab-12cd34ef56ab',
   posId: 46,
@@ -109,6 +127,22 @@ export class OrderController {
   @ApiUnauthorizedResponse({ description: 'Missing or invalid access token' })
   create(@RequestUser() user: ReqUser, @Query() query: BasicQuery, @Body() body: CreateOrderRequest) {
     return this.orderService.create(user.id, query.locale, body);
+  }
+
+  @Post('evaluate')
+  @HttpCode(200)
+  @ApiOperation({
+    summary: "Evaluate an order's price before creating it",
+    description:
+      'Computes the same pricing that order creation would use — per-item price after discounts, the delivery ' +
+      'cost when `type` is `delivery`, a breakdown of every discount applied (name + amount), and the overall ' +
+      'total — without persisting anything or contacting the POS.',
+  })
+  @ApiOkResponse({ description: 'Order price evaluation', schema: { example: evaluateOrderExample } })
+  @ApiBadRequestResponse({ description: 'One or more products/branch/address are missing or invalid' })
+  @ApiUnauthorizedResponse({ description: 'Missing or invalid access token' })
+  evaluate(@RequestUser() user: ReqUser, @Query() query: BasicQuery, @Body() body: CreateOrderRequest) {
+    return this.orderService.evaluate(user.id, query.locale, body);
   }
 
   @Get('delivery-cost')
