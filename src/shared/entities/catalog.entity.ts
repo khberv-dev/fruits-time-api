@@ -3,6 +3,7 @@ import { Localized } from '@/shared/types/localized.type';
 import { Product } from '@/shared/entities/product.entity';
 import { Locale } from '@/shared/enums/locale.enum';
 import { getObjectDefaultValue } from '@/shared/utils/lib';
+import { ProductType } from '@/shared/enums/product-type.enum';
 
 @Entity('catalogs')
 export class Catalog {
@@ -14,6 +15,9 @@ export class Catalog {
 
   @Column({ type: 'jsonb', default: {} })
   title: Localized<string>;
+
+  @Column({ type: 'enum', enum: ProductType, default: ProductType.JUICE })
+  type: ProductType;
 
   @OneToMany(() => Product, (product) => product.catalog)
   products: Product[];

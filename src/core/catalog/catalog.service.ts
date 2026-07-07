@@ -35,6 +35,7 @@ export class CatalogService {
     return this.catalogRepo.save({
       title: { [locale]: data.title },
       image: fileName,
+      ...(data.type && { type: data.type }),
     });
   }
 
@@ -55,6 +56,10 @@ export class CatalogService {
 
     if (data.title) {
       catalog.title = { ...catalog.title, [locale]: data.title };
+    }
+
+    if (data.type != undefined) {
+      catalog.type = data.type;
     }
 
     if (data.isActive != undefined) {

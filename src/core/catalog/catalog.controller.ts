@@ -24,6 +24,7 @@ const catalogExample = {
   id: 'd7f9b3b4-9a4d-4b56-9b4a-3d2e3f1a0c4f',
   image: '4f1c2a8f-5b6e-4d3b-9c2a-1f2c8d3a4e5b.jpg',
   title: 'Juices',
+  type: 'juice',
   isActive: true,
   productsCount: 12,
   createdAt: '2025-01-10T08:00:00.000Z',
