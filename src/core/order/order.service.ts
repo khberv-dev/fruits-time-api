@@ -19,9 +19,8 @@ import { OrderStatus } from '@/shared/enums/order-status.enum';
 import { computeUserStatus, getStatusDiscount } from '@/core/user/user.service';
 import { DeliveryCreateOrderInput } from '@/core/delivery/types/delivery-create-order-input.type';
 import { DeliveryWebhookBody } from '@/core/delivery/types/delivery-webhook-body.type';
-import { DeliveryDiscount, ItemDiscount, PromotionService } from '@/core/promotion/promotion.service';
+import { DeliveryDiscount, ItemDiscount, OrderItemInput, PromotionService } from '@/core/promotion/promotion.service';
 import { PromotionType } from '@/shared/enums/promotion-type.enum';
-import { CreateOrderItem } from '@/core/order/dto/create-order-request.dto';
 
 const DELIVERY_STAGE_MESSAGE: Record<number, string> = {
   1: 'Buyurtmangiz qabul qilindi',
@@ -101,6 +100,7 @@ function aggregatePromoByIndex(itemDiscounts: ItemDiscount[]): Map<number, Promo
 }
 
 interface PreparedOrder {
+  items: OrderItemInput[];
   branch: Branch;
   products: Product[];
   productById: Map<string, Product>;
@@ -186,7 +186,7 @@ export class OrderService {
     let subtotal = 0;
     let total = 0;
 
-    const items = data.items.map((item, index) => {
+    const items = prepared.items.map((item, index) => {
       const product = productById.get(item.productId)!;
       const lineTotal = product.price * item.quantity;
       const price = getItemLinePrice(index, product.price, item.quantity);
@@ -203,7 +203,7 @@ export class OrderService {
       };
     });
 
-    const discounts = this.buildDiscountBreakdown(data.items, productById, promoByIndex, discountPercent);
+    const discounts = this.buildDiscountBreakdown(prepared.items, productById, promoByIndex, discountPercent);
     if (deliveryDiscount) discounts.push(deliveryDiscount);
 
     return {
@@ -221,6 +221,7 @@ export class OrderService {
     if (activeOrder) throw new BadRequestException('Sizda allaqachon faol buyurtma mavjud');
 
     const {
+      items,
       branch,
       products,
       productById,
@@ -240,7 +241,7 @@ export class OrderService {
         user: { id: userId } as User,
         type: data.type,
         address: addressSnapshot,
-        items: data.items.map((item, index) => {
+        items: items.map((item, index) => {
           const product = productById.get(item.productId)!;
           const lineTotal = product.price * item.quantity;
           return {
@@ -257,7 +258,15 @@ export class OrderService {
         relations: ['items', 'items.product'],
       });
 
-      order.posId = await this.sendToPoster(userId, products, data, branch.posId, getItemUnitPrice, deliveryCost);
+      order.posId = await this.sendToPoster(
+        userId,
+        products,
+        items,
+        data.type,
+        branch.posId,
+        getItemUnitPrice,
+        deliveryCost,
+      );
       order.deliveryCost = deliveryCost ?? null;
 
       if (data.type === OrderType.DELIVERY && deliveryInput) {
@@ -275,7 +284,8 @@ export class OrderService {
   // Shared by create() and evaluate(): validates the branch/products/address and
   // computes per-line pricing (referral-tier + promotion discounts, delivery quote).
   private async prepareOrder(userId: string, locale: Locale, data: CreateOrderRequest): Promise<PreparedOrder> {
-    const productIds = [...new Set(data.items.map((item) => item.productId))];
+    const items = await this.promotionService.applyAutoAddedItems(data.items);
+    const productIds = [...new Set(items.map((item) => item.productId))];
 
     const products = await this.productRepo.find({ where: { id: In(productIds), isActive: true } });
     const branch = await this.branchRepo.findOne({ where: { id: data.branchId, isActive: true } });
@@ -322,7 +332,7 @@ export class OrderService {
     const referralCount = await this.userRepo.count({ where: { referredBy: { id: userId } } });
     const discountPercent = getStatusDiscount(computeUserStatus(referralCount));
 
-    const itemDiscounts = await this.promotionService.computeItemDiscounts(userId, data.items);
+    const itemDiscounts = await this.promotionService.computeItemDiscounts(userId, items);
     const promoByIndex = aggregatePromoByIndex(itemDiscounts);
 
     // Combines the referral-tier discount with any promotion for this line: promo-free
@@ -358,7 +368,7 @@ export class OrderService {
 
       deliveryInput = {
         vendorOrderId: '',
-        items: data.items.map((item, index) => {
+        items: items.map((item, index) => {
           const product = productById.get(item.productId)!;
           return {
             name: product.getTitle(locale),
@@ -393,6 +403,7 @@ export class OrderService {
     }
 
     return {
+      items,
       branch,
       products,
       productById,
@@ -411,7 +422,7 @@ export class OrderService {
   // Attributes the money saved per line to the discount that produced it (referral tier
   // vs. a specific promotion), so evaluate() can show the user a "name + amount" breakdown.
   private buildDiscountBreakdown(
-    items: CreateOrderItem[],
+    items: OrderItemInput[],
     productById: Map<string, Product>,
     promoByIndex: Map<number, PromoAggregate>,
     discountPercent: number,
@@ -508,7 +519,8 @@ export class OrderService {
   private async sendToPoster(
     userId: string,
     products: Product[],
-    data: CreateOrderRequest,
+    items: OrderItemInput[],
+    type: OrderType,
     spotId: number,
     getItemUnitPrice: (index: number, unitPrice: number, quantity: number) => number,
     deliveryCost?: number,
@@ -522,7 +534,7 @@ export class OrderService {
     const productById = new Map(products.map((product) => [product.id, product]));
     const posterProducts: { id: number; count: number; price?: number }[] = [];
 
-    for (const [index, item] of data.items.entries()) {
+    for (const [index, item] of items.entries()) {
       const product = productById.get(item.productId);
       if (!product?.posId) {
         this.logger.error(`POS order rejected: product ${item.productId} has no posId`);
@@ -538,10 +550,10 @@ export class OrderService {
     const posOrderId = await this.posterService.createOrder({
       spotId,
       autoAccept: false,
-      serviceMode: data.type === OrderType.DELIVERY ? 3 : 2,
+      serviceMode: type === OrderType.DELIVERY ? 3 : 2,
       client: { id: user.posId },
       products: posterProducts,
-      ...(data.type === OrderType.DELIVERY
+      ...(type === OrderType.DELIVERY
         ? { delivery: { ...POSTER_DELIVERY_BASE, deliveryPrice: deliveryCost ?? 15_000 } }
         : {}),
     });

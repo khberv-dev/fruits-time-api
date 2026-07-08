@@ -5,9 +5,10 @@ import { Branch } from '@/shared/entities/branch.entity';
 import { ProductController } from '@/core/product/product.controller';
 import { ProductService } from '@/core/product/product.service';
 import { PosterModule } from '@/core/poster/poster.module';
+import { PromotionModule } from '@/core/promotion/promotion.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Product, Branch]), PosterModule],
+  imports: [TypeOrmModule.forFeature([Product, Branch]), PosterModule, PromotionModule],
   controllers: [ProductController],
   providers: [ProductService],
 })

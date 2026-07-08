@@ -9,6 +9,7 @@ import { CreateProductRequest } from '@/core/product/dto/create-product-request.
 import { UpdateProductRequest } from '@/core/product/dto/update-product-request.dto';
 import { PosterService } from '@/core/poster/poster.service';
 import { ProductAvailability } from '@/shared/types/product-availability.type';
+import { PromotionService } from '@/core/promotion/promotion.service';
 
 @Injectable()
 export class ProductService {
@@ -18,6 +19,7 @@ export class ProductService {
     @InjectRepository(Product) private readonly productRepo: Repository<Product>,
     @InjectRepository(Branch) private readonly branchRepo: Repository<Branch>,
     private readonly posterService: PosterService,
+    private readonly promotionService: PromotionService,
   ) {}
 
   @Cron(CronExpression.EVERY_10_MINUTES)
@@ -83,12 +85,14 @@ export class ProductService {
     qb.andWhere('p.catalog_id = :catalogId', { catalogId }).orderBy('p.index', 'ASC');
 
     const products = await qb.getMany();
+    const promotionsByProduct = await this.promotionService.getProductPromotions(products.map((p) => p.id));
 
     return products.map((product) => ({
       ...product,
       title: product.getTitle(locale),
       description: product.getDescription(locale),
       compound: product.getCompound(locale),
+      promotions: promotionsByProduct.get(product.id) ?? [],
     }));
   }
 
@@ -116,12 +120,14 @@ export class ProductService {
     );
 
     const products = await qb.getMany();
+    const promotionsByProduct = await this.promotionService.getProductPromotions(products.map((p) => p.id));
 
     return products.map((product) => ({
       ...product,
       title: product.getTitle(locale),
       description: product.getDescription(locale),
       compound: product.getCompound(locale),
+      promotions: promotionsByProduct.get(product.id) ?? [],
     }));
   }
 

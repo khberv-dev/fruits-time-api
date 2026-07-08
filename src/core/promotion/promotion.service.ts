@@ -35,6 +35,11 @@ export interface UpdatePromotionData {
   productIds?: string[];
 }
 
+export interface ProductPromotion {
+  type: PromotionType;
+  name: string;
+}
+
 const LOYALTY_INTERVAL = 10;
 const BUY_TWO_GET_ONE_INTERVAL = 3;
 const FREE_DELIVERY_DISCOUNT_AMOUNT = 22_000;
@@ -97,6 +102,26 @@ export class PromotionService implements OnApplicationBootstrap {
     return this.promotionRepo.save(promotion);
   }
 
+  // "2+1": the customer only adds the units they're paying for; we top up the cart with
+  // the free unit(s) automatically instead of requiring them to add it themselves. Every
+  // 2 paid units of an eligible product earns 1 free unit (e.g. 2 -> 3, 4 -> 6, 5 -> 6).
+  async applyAutoAddedItems(items: OrderItemInput[]): Promise<OrderItemInput[]> {
+    const promotion = await this.promotionRepo.findOne({
+      where: { type: PromotionType.BUY_TWO_GET_ONE_FREE, isActive: true },
+    });
+    const eligibleProductIds = new Set(promotion?.productIds ?? []);
+    if (eligibleProductIds.size === 0) return items;
+
+    const paidGroupSize = BUY_TWO_GET_ONE_INTERVAL - 1;
+
+    return items.map((item) => {
+      if (!eligibleProductIds.has(item.productId)) return item;
+
+      const freeUnits = Math.floor(item.quantity / paidGroupSize);
+      return freeUnits > 0 ? { ...item, quantity: item.quantity + freeUnits } : item;
+    });
+  }
+
   async computeItemDiscounts(userId: string, items: OrderItemInput[]): Promise<ItemDiscount[]> {
     const activePromotions = await this.promotionRepo.find({ where: { isActive: true } });
     if (!activePromotions.length) return [];
@@ -121,6 +146,31 @@ export class PromotionService implements OnApplicationBootstrap {
 
   getDisplayName(type: PromotionType): string {
     return PROMOTION_NAMES[type];
+  }
+
+  // Maps each requested product to the active, product-scoped promotions it's eligible
+  // for (currently just buy-two-get-one-free), for display on product listings.
+  async getProductPromotions(productIds: string[]): Promise<Map<string, ProductPromotion[]>> {
+    const result = new Map<string, ProductPromotion[]>();
+    if (!productIds.length) return result;
+
+    const activePromotions = await this.promotionRepo.find({ where: { isActive: true } });
+    const requestedIds = new Set(productIds);
+
+    for (const promotion of activePromotions) {
+      if (!promotion.productIds?.length) continue;
+
+      const entry: ProductPromotion = { type: promotion.type, name: this.getDisplayName(promotion.type) };
+      for (const productId of promotion.productIds) {
+        if (!requestedIds.has(productId)) continue;
+
+        const existing = result.get(productId) ?? [];
+        existing.push(entry);
+        result.set(productId, existing);
+      }
+    }
+
+    return result;
   }
 
   async getLoyaltyStatus(userId: string): Promise<LoyaltyStatus> {

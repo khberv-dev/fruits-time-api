@@ -30,6 +30,7 @@ const productExample = {
   price: 25000,
   type: 'juice',
   isActive: true,
+  promotions: [{ type: 'buy_two_get_one_free', name: '2+1 aksiya (har 3-mahsulot bepul)' }],
   createdAt: '2025-01-12T08:00:00.000Z',
   updatedAt: '2025-01-12T08:00:00.000Z',
 };
