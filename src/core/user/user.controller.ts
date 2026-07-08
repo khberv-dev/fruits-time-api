@@ -7,13 +7,14 @@ import {
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
-import { UserService } from '@/core/user/user.service';
+import { getStatusTiers, UserService } from '@/core/user/user.service';
 import { RequestUser } from '@/common/decorators/request-user.decorator';
 import type { ReqUser } from '@/shared/types/req-user.type';
 import { Role } from '@/common/decorators/role.decorator';
 import { UserRole } from '@/shared/enums/user-role.enum';
 import { PaginationQuery } from '@/shared/dto/pagination-query.dto';
 import { UpdateUserRequest } from '@/core/user/dto/update-user-request.dto';
+import { IsPublic } from '@/common/decorators/is_public.decorator';
 
 const userExample = {
   id: '6b0a0e1e-5f55-4a3a-9a9b-3a4f2c8a0c1e',
@@ -44,6 +45,29 @@ export class UserController {
   @ApiUnauthorizedResponse({ description: 'Missing or invalid access token' })
   getMe(@RequestUser() user: ReqUser) {
     return this.userService.findById(user.id);
+  }
+
+  @Get('status-tiers')
+  @IsPublic()
+  @ApiOperation({
+    summary: 'List all referral status tiers and their discount percentages',
+    description:
+      'Static reference data (not tied to the caller): the referral count needed to reach each tier and the ' +
+      'discount percentage it grants.',
+  })
+  @ApiOkResponse({
+    description: 'All status tiers, ascending by referral threshold',
+    schema: {
+      example: [
+        { status: 'silver', minReferrals: 0, discountPercent: 0 },
+        { status: 'gold', minReferrals: 1, discountPercent: 3 },
+        { status: 'vip', minReferrals: 6, discountPercent: 7 },
+        { status: 'premium', minReferrals: 11, discountPercent: 12 },
+      ],
+    },
+  })
+  listStatusTiers() {
+    return getStatusTiers();
   }
 
   @Get('me/referral')

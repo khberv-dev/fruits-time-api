@@ -26,6 +26,10 @@ const STATUS_TIERS: { status: UserStatus; minReferrals: number; discountPercent:
   { status: UserStatus.PREMIUM, minReferrals: 11, discountPercent: 12 },
 ];
 
+export function getStatusTiers() {
+  return STATUS_TIERS;
+}
+
 export function computeUserStatus(referralCount: number): UserStatus {
   return getTier(referralCount).status;
 }
