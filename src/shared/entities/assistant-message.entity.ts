@@ -18,6 +18,6 @@ export class AssistantMessage {
   @Column({ type: 'text' })
   text: string;
 
-  @CreateDateColumn({ name: 'created_at' })
+  @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 }
