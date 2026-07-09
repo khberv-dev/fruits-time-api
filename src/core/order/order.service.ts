@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { In, LessThan, Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import dayjs from 'dayjs';
 import { Order } from '@/shared/entities/order.entity';
 import { Product } from '@/shared/entities/product.entity';
@@ -134,20 +134,6 @@ export class OrderService {
     private readonly pushService: PushService,
     private readonly promotionService: PromotionService,
   ) {}
-
-  // An order still in CREATED status has never shown up as a POS transaction (see
-  // markAcceptedOrders, which flips it to ACCEPTED once it does) — staff never accepted it.
-  @Cron(CronExpression.EVERY_5_MINUTES)
-  async cancelStaleOrders(): Promise<void> {
-    const cutoff = new Date(Date.now() - 20 * 60 * 1000);
-    const { affected } = await this.orderRepo.update(
-      { status: OrderStatus.CREATED, createdAt: LessThan(cutoff) },
-      { status: OrderStatus.CANCELLED },
-    );
-    if (affected) {
-      this.logger.log(`cancelStaleOrders: cancelled ${affected} order(s) not accepted in POS within 20 minutes`);
-    }
-  }
 
   async getDeliveryCost(userId: string, branchId: string, addressId: string): Promise<{ cost: number }> {
     const [branch, address, user] = await Promise.all([
