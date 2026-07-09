@@ -206,8 +206,13 @@ export class OrderService {
     const discounts = this.buildDiscountBreakdown(prepared.items, productById, promoByIndex, discountPercent);
     if (deliveryDiscount) discounts.push(deliveryDiscount);
 
+    const productsCount = prepared.items.reduce((sum, item) => sum + item.quantity, 0);
+    const productTypesCount = new Set(prepared.items.map((item) => item.productId)).size;
+
     return {
       items,
+      productsCount,
+      productTypesCount,
       subtotal,
       discounts,
       discountTotal: subtotal - total,
@@ -421,8 +426,9 @@ export class OrderService {
 
   // Attributes the money saved per line to the discount that produced it (referral tier
   // vs. a specific promotion), so evaluate() can show the user a "name + amount" breakdown.
-  // Fully-free units (loyalty, buy-two-get-one-free) are counted, not priced out per type,
-  // and rolled into a single "Bonus mahsulotlar" entry with `amount` = number of free units.
+  // Fully-free units (loyalty, buy-two-get-one-free) don't add a money line here — their
+  // value is already folded into each item's `price`, and their count is surfaced via
+  // evaluate()'s `productsCount`/`productTypesCount` instead.
   private buildDiscountBreakdown(
     items: OrderItemInput[],
     productById: Map<string, Product>,
@@ -430,7 +436,6 @@ export class OrderService {
     discountPercent: number,
   ): { name: string; amount: number }[] {
     let statusAmount = 0;
-    let bonusCount = 0;
     const promoAmountByType = new Map<PromotionType, number>();
 
     items.forEach((item, index) => {
@@ -438,8 +443,6 @@ export class OrderService {
       const promo = promoByIndex.get(index);
       const freeUnits = Math.min(promo?.freeUnits ?? 0, item.quantity);
       const paidQuantity = item.quantity - freeUnits;
-
-      bonusCount += freeUnits;
 
       const promoPercent = promo?.discountPercent ?? 0;
       const appliedPercent = Math.max(discountPercent, promoPercent);
@@ -462,9 +465,6 @@ export class OrderService {
     }
     for (const [type, amount] of promoAmountByType) {
       if (amount > 0) discounts.push({ name: this.promotionService.getDisplayName(type), amount });
-    }
-    if (bonusCount > 0) {
-      discounts.push({ name: 'Bonus mahsulotlar', amount: bonusCount });
     }
 
     return discounts;
