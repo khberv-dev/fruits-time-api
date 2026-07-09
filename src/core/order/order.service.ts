@@ -222,7 +222,9 @@ export class OrderService {
   }
 
   async create(userId: string, locale: Locale, data: CreateOrderRequest) {
-    const activeOrder = await this.orderRepo.findOne({ where: { user: { id: userId }, status: OrderStatus.CREATED } });
+    const activeOrder = await this.orderRepo.findOne({
+      where: { user: { id: userId }, status: In([OrderStatus.CREATED, OrderStatus.ACCEPTED]) },
+    });
     if (activeOrder) throw new BadRequestException('Sizda allaqachon faol buyurtma mavjud');
 
     const {
@@ -474,6 +476,8 @@ export class OrderService {
 
   @Cron(CronExpression.EVERY_MINUTE)
   async dispatchPendingDeliveries(): Promise<void> {
+    await this.markAcceptedOrders();
+
     const cutoff = new Date(Date.now() - 10 * 60 * 1000);
 
     // Clear payload for orders that missed the acceptance window
@@ -481,36 +485,23 @@ export class OrderService {
       .createQueryBuilder()
       .update()
       .set({ deliveryPayload: () => 'NULL' })
-      .where(
-        'type = :type AND status = :status AND delivery_payload IS NOT NULL AND created_at < :cutoff',
-        { type: OrderType.DELIVERY, status: OrderStatus.CREATED, cutoff },
-      )
+      .where('type = :type AND status IN (:...statuses) AND delivery_payload IS NOT NULL AND created_at < :cutoff', {
+        type: OrderType.DELIVERY,
+        statuses: [OrderStatus.CREATED, OrderStatus.ACCEPTED],
+        cutoff,
+      })
       .execute();
 
     const pending = await this.orderRepo.find({
       where: {
         type: OrderType.DELIVERY,
-        status: OrderStatus.CREATED,
+        status: OrderStatus.ACCEPTED,
         deliveryPayload: Not(IsNull()),
         createdAt: MoreThan(cutoff),
       },
-      relations: ['user'],
     });
 
-    if (!pending.length) return;
-
-    const dateFrom = new Date(Date.now() - 15 * 60 * 1000);
-    const acceptedIds = await this.posterService.getTransactions(dateFrom);
-    const accepted = new Set(acceptedIds);
-
     for (const order of pending) {
-      if (order.posId === null || !accepted.has(order.posId)) continue;
-
-      const session = await this.sessionRepo.findOne({ where: { user: { id: order.user.id } } });
-      if (session?.fcmToken) {
-        await this.pushService.send(session.fcmToken, 'Fruits Time', 'Buyurtmangiz qabul qilindi');
-      }
-
       const ok = await this.deliveryService.createOrder(order.deliveryPayload!);
       if (ok) {
         await this.orderRepo.update(order.id, { deliveryPayload: null });
@@ -519,6 +510,35 @@ export class OrderService {
         this.logger.error(`dispatchPendingDeliveries: delivery dispatch failed for order ${order.id}`);
       }
     }
+  }
+
+  // Flips any order (pickup or delivery) from CREATED to ACCEPTED once it shows up as a
+  // transaction in POS (i.e. staff opened/accepted the incoming order), and notifies the
+  // customer exactly once for that transition.
+  private async markAcceptedOrders(): Promise<void> {
+    const dateFrom = new Date(Date.now() - 15 * 60 * 1000);
+    const acceptedIds = await this.posterService.getTransactions(dateFrom);
+    if (!acceptedIds.length) return;
+
+    const newlyAccepted = await this.orderRepo.find({
+      where: { status: OrderStatus.CREATED, posId: In(acceptedIds) },
+      relations: ['user'],
+    });
+    if (!newlyAccepted.length) return;
+
+    await this.orderRepo.update(
+      { status: OrderStatus.CREATED, posId: In(acceptedIds) },
+      { status: OrderStatus.ACCEPTED },
+    );
+
+    for (const order of newlyAccepted) {
+      const session = await this.sessionRepo.findOne({ where: { user: { id: order.user.id } } });
+      if (session?.fcmToken) {
+        await this.pushService.send(session.fcmToken, 'Fruits Time', 'Buyurtmangiz qabul qilindi');
+      }
+    }
+
+    this.logger.log(`markAcceptedOrders: marked ${newlyAccepted.length} order(s) as accepted`);
   }
 
   private async sendToPoster(
@@ -571,7 +591,7 @@ export class OrderService {
 
   async getActiveForUser(userId: string, locale: Locale) {
     const order = await this.orderRepo.findOne({
-      where: { user: { id: userId }, status: OrderStatus.CREATED },
+      where: { user: { id: userId }, status: In([OrderStatus.CREATED, OrderStatus.ACCEPTED]) },
       relations: ['items', 'items.product'],
     });
     return order ? this.mapOrder(order, locale) : null;
