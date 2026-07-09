@@ -426,9 +426,6 @@ export class OrderService {
 
   // Attributes the money saved per line to the discount that produced it (referral tier
   // vs. a specific promotion), so evaluate() can show the user a "name + amount" breakdown.
-  // Fully-free units (loyalty, buy-two-get-one-free) don't add a money line here — their
-  // value is already folded into each item's `price`, and their count is surfaced via
-  // evaluate()'s `productsCount`/`productTypesCount` instead.
   private buildDiscountBreakdown(
     items: OrderItemInput[],
     productById: Map<string, Product>,
@@ -443,6 +440,11 @@ export class OrderService {
       const promo = promoByIndex.get(index);
       const freeUnits = Math.min(promo?.freeUnits ?? 0, item.quantity);
       const paidQuantity = item.quantity - freeUnits;
+
+      if (freeUnits > 0 && promo?.freeUnitsType) {
+        const type = promo.freeUnitsType;
+        promoAmountByType.set(type, (promoAmountByType.get(type) ?? 0) + freeUnits * product.price);
+      }
 
       const promoPercent = promo?.discountPercent ?? 0;
       const appliedPercent = Math.max(discountPercent, promoPercent);
