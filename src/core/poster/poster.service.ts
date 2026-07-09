@@ -141,12 +141,15 @@ export class PosterService {
     }
   }
 
-  async getTransactions(dateFrom: Date): Promise<number[]> {
+  async getTransactions(): Promise<number[]> {
     try {
-      const formatted = dateFrom.toISOString().replace('T', ' ').slice(0, 19);
+      const today = new Date();
+      const yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000);
+      const format = (date: Date) => date.toISOString().slice(0, 10);
+
       const { data } = await this.apiClient.get<PosterResponse<{ data: { transaction_id: number }[] }>>(
         '/transactions.getTransactions',
-        { params: { date_from: formatted } },
+        { params: { date_from: format(yesterday), date_to: format(today) } },
       );
 
       if (data.error !== undefined && data.error !== 0) {

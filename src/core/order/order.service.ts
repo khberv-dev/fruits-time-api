@@ -516,8 +516,7 @@ export class OrderService {
   // transaction in POS (i.e. staff opened/accepted the incoming order), and notifies the
   // customer exactly once for that transition.
   private async markAcceptedOrders(): Promise<void> {
-    const dateFrom = new Date(Date.now() - 15 * 60 * 1000);
-    const acceptedIds = await this.posterService.getTransactions(dateFrom);
+    const acceptedIds = await this.posterService.getTransactions();
     if (!acceptedIds.length) return;
 
     const newlyAccepted = await this.orderRepo.find({
