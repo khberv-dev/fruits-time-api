@@ -421,6 +421,8 @@ export class OrderService {
 
   // Attributes the money saved per line to the discount that produced it (referral tier
   // vs. a specific promotion), so evaluate() can show the user a "name + amount" breakdown.
+  // Fully-free units (loyalty, buy-two-get-one-free) are counted, not priced out per type,
+  // and rolled into a single "Bonus mahsulotlar" entry with `amount` = number of free units.
   private buildDiscountBreakdown(
     items: OrderItemInput[],
     productById: Map<string, Product>,
@@ -428,6 +430,7 @@ export class OrderService {
     discountPercent: number,
   ): { name: string; amount: number }[] {
     let statusAmount = 0;
+    let bonusCount = 0;
     const promoAmountByType = new Map<PromotionType, number>();
 
     items.forEach((item, index) => {
@@ -436,10 +439,7 @@ export class OrderService {
       const freeUnits = Math.min(promo?.freeUnits ?? 0, item.quantity);
       const paidQuantity = item.quantity - freeUnits;
 
-      if (freeUnits > 0 && promo?.freeUnitsType) {
-        const type = promo.freeUnitsType;
-        promoAmountByType.set(type, (promoAmountByType.get(type) ?? 0) + freeUnits * product.price);
-      }
+      bonusCount += freeUnits;
 
       const promoPercent = promo?.discountPercent ?? 0;
       const appliedPercent = Math.max(discountPercent, promoPercent);
@@ -462,6 +462,9 @@ export class OrderService {
     }
     for (const [type, amount] of promoAmountByType) {
       if (amount > 0) discounts.push({ name: this.promotionService.getDisplayName(type), amount });
+    }
+    if (bonusCount > 0) {
+      discounts.push({ name: 'Bonus mahsulotlar', amount: bonusCount });
     }
 
     return discounts;

@@ -57,12 +57,23 @@ const evaluateOrderExample = {
       lineTotal: 50000,
       price: 35000,
     },
+    {
+      productId: 'c2e5ff3d-3f1b-5a23-9b9c-4b5e6f7a8c9d',
+      title: 'Orange Juice',
+      quantity: 3,
+      unitPrice: 28000,
+      lineTotal: 84000,
+      price: 56000,
+    },
   ],
-  subtotal: 50000,
-  discounts: [{ name: 'Birinchi buyurtma uchun chegirma', amount: 15000 }],
-  discountTotal: 15000,
+  subtotal: 134000,
+  discounts: [
+    { name: 'Birinchi buyurtma uchun chegirma', amount: 15000 },
+    { name: 'Bonus mahsulotlar', amount: 1 },
+  ],
+  discountTotal: 43000,
   deliveryCost: 12000,
-  total: 47000,
+  total: 103000,
 };
 
 const orderExample2 = {
@@ -136,7 +147,9 @@ export class OrderController {
     description:
       'Computes the same pricing that order creation would use — per-item price after discounts, the delivery ' +
       'cost when `type` is `delivery`, a breakdown of every discount applied (name + amount), and the overall ' +
-      'total — without persisting anything or contacting the POS.',
+      'total — without persisting anything or contacting the POS. Free/bonus units granted by a promotion ' +
+      '(e.g. buy-two-get-one-free) appear in `discounts` as `{ name: "Bonus mahsulotlar", amount: <free unit count> }` ' +
+      '— note `amount` there is a unit count, not a currency value, unlike every other entry in the array.',
   })
   @ApiOkResponse({ description: 'Order price evaluation', schema: { example: evaluateOrderExample } })
   @ApiBadRequestResponse({ description: 'One or more products/branch/address are missing or invalid' })
