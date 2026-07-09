@@ -134,15 +134,17 @@ export class OrderService {
     private readonly promotionService: PromotionService,
   ) {}
 
+  // An order still in CREATED status has never shown up as a POS transaction (see
+  // markAcceptedOrders, which flips it to ACCEPTED once it does) — staff never accepted it.
   @Cron(CronExpression.EVERY_5_MINUTES)
   async cancelStaleOrders(): Promise<void> {
-    const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const cutoff = new Date(Date.now() - 20 * 60 * 1000);
     const { affected } = await this.orderRepo.update(
       { status: OrderStatus.CREATED, createdAt: LessThan(cutoff) },
       { status: OrderStatus.CANCELLED },
     );
     if (affected) {
-      this.logger.log(`cancelStaleOrders: cancelled ${affected} orders older than 2 hours`);
+      this.logger.log(`cancelStaleOrders: cancelled ${affected} order(s) not accepted in POS within 20 minutes`);
     }
   }
 
@@ -396,16 +398,17 @@ export class OrderService {
       };
 
       const evaluated = await this.deliveryService.evalOrder({ ...deliveryInput, vendorOrderId: 'eval' });
-      deliveryCost = evaluated ?? undefined;
+      if (evaluated === null) {
+        throw new InternalServerErrorException('Yetkazib berish narxini hisoblashda xatolik');
+      }
+      deliveryCost = evaluated;
 
       // "3km free delivery": flat amount off the quote, floored at 0 rather than going negative.
-      if (deliveryCost !== undefined) {
-        const discount = await this.promotionService.getDeliveryDiscount();
-        if (discount) {
-          const amount = Math.min(deliveryCost, discount.amount);
-          deliveryCost -= amount;
-          deliveryDiscount = { name: discount.name, amount };
-        }
+      const discount = await this.promotionService.getDeliveryDiscount();
+      if (discount) {
+        const amount = Math.min(deliveryCost, discount.amount);
+        deliveryCost -= amount;
+        deliveryDiscount = { name: discount.name, amount };
       }
     }
 

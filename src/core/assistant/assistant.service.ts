@@ -1,4 +1,4 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { GoogleGenAI, Type } from '@google/genai';
 import { ConfigService } from '@nestjs/config';
 import { InstructionsService } from '@/core/assistant/instructions.service';
@@ -15,6 +15,7 @@ const PRODUCTS_TTL_MS = 60_000;
 
 @Injectable()
 export class AssistantService implements OnModuleInit {
+  private readonly logger = new Logger(AssistantService.name);
   private ai: GoogleGenAI;
   private productsCache: { products: Product[]; expiresAt: number } | null = null;
 
@@ -60,24 +61,30 @@ export class AssistantService implements OnModuleInit {
       { role: MessageRole.USER, parts: [{ text }] },
     ];
 
-    const response = await this.ai.models.generateContent({
-      model: this.config.getOrThrow('GENAI_MODEL'),
-      contents,
-      config: {
-        systemInstruction: this.instructionService.buildNutritionistInstructions(products, user),
-        responseMimeType: 'application/json',
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            hasAnswer: { type: Type.BOOLEAN },
-            text: { type: Type.STRING },
-            suggestions: { type: Type.ARRAY, items: { type: Type.STRING } },
-            cart: { type: Type.ARRAY, items: { type: Type.STRING } },
+    let response;
+    try {
+      response = await this.ai.models.generateContent({
+        model: this.config.getOrThrow('GENAI_MODEL'),
+        contents,
+        config: {
+          systemInstruction: this.instructionService.buildNutritionistInstructions(products, user),
+          responseMimeType: 'application/json',
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              hasAnswer: { type: Type.BOOLEAN },
+              text: { type: Type.STRING },
+              suggestions: { type: Type.ARRAY, items: { type: Type.STRING } },
+              cart: { type: Type.ARRAY, items: { type: Type.STRING } },
+            },
+            required: ['hasAnswer', 'text', 'suggestions', 'cart'],
           },
-          required: ['hasAnswer', 'text', 'suggestions', 'cart'],
         },
-      },
-    });
+      });
+    } catch (error) {
+      this.logger.error(`generateContent failed: ${error instanceof Error ? error.message : String(error)}`);
+      throw error;
+    }
 
     const responseText = response.text ?? '{}';
 

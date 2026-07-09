@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import axios, { AxiosInstance } from 'axios';
 import { Agent as HttpAgent } from 'http';
 import { Agent as HttpsAgent } from 'https';
+import { Socket } from 'net';
 import { ConfigService } from '@nestjs/config';
 import { DeliveryCreateOrderInput } from '@/core/delivery/types/delivery-create-order-input.type';
 
@@ -15,6 +16,12 @@ export class DeliveryService {
     const httpsAgent = new HttpsAgent({ keepAlive: true });
     httpAgent.setMaxListeners(0);
     httpsAgent.setMaxListeners(0);
+    // setMaxListeners above only covers the agent's own events; keep-alive sockets are
+    // separate EventEmitters and need their own limit raised too, otherwise reusing the
+    // same socket across many requests eventually trips MaxListenersExceededWarning.
+    const uncapSocketListeners = (socket: unknown) => (socket as Socket).setMaxListeners(0);
+    httpAgent.on('free', uncapSocketListeners);
+    httpsAgent.on('free', uncapSocketListeners);
 
     const apiKey = this.config.get<string>('DELIVERY_API_KEY');
 

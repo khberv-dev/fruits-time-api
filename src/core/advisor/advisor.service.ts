@@ -1,4 +1,4 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { GoogleGenAI, Type } from '@google/genai';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -10,6 +10,7 @@ import { User } from '@/shared/entities/user.entity';
 
 @Injectable()
 export class AdvisorService implements OnModuleInit {
+  private readonly logger = new Logger(AdvisorService.name);
   private ai: GoogleGenAI;
 
   constructor(
@@ -40,22 +41,28 @@ export class AdvisorService implements OnModuleInit {
       { role: MessageRole.USER, parts: [{ text }] },
     ];
 
-    const response = await this.ai.models.generateContent({
-      model: this.config.getOrThrow('GENAI_MODEL'),
-      contents,
-      config: {
-        systemInstruction,
-        responseMimeType: 'application/json',
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            hasAnswer: { type: Type.BOOLEAN },
-            text: { type: Type.STRING },
+    let response;
+    try {
+      response = await this.ai.models.generateContent({
+        model: this.config.getOrThrow('GENAI_MODEL'),
+        contents,
+        config: {
+          systemInstruction,
+          responseMimeType: 'application/json',
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              hasAnswer: { type: Type.BOOLEAN },
+              text: { type: Type.STRING },
+            },
+            required: ['hasAnswer', 'text'],
           },
-          required: ['hasAnswer', 'text'],
         },
-      },
-    });
+      });
+    } catch (error) {
+      this.logger.error(`generateContent failed: ${error instanceof Error ? error.message : String(error)}`);
+      throw error;
+    }
 
     const responseText = response.text ?? '{}';
 
