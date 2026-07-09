@@ -597,6 +597,27 @@ export class OrderService {
     };
   }
 
+  async cancelOrder(orderId: string, locale: Locale) {
+    const order = await this.orderRepo.findOne({
+      where: { id: orderId },
+      relations: ['items', 'items.product'],
+    });
+
+    if (!order) {
+      throw new BadRequestException('Buyurtma topilmadi');
+    }
+
+    if (order.status === OrderStatus.CANCELLED || order.status === OrderStatus.DONE) {
+      throw new BadRequestException("Buyurtmani bekor qilib bo'lmaydi");
+    }
+
+    order.status = OrderStatus.CANCELLED;
+    order.deliveryPayload = null;
+    await this.orderRepo.save(order);
+
+    return this.mapOrder(order, locale);
+  }
+
   handleDeliveryWebhook(body: unknown): void {
     this.logger.log(`handle-order webhook: ${JSON.stringify(body)}`);
     this.processDeliveryWebhook(body as DeliveryWebhookBody).catch((err: unknown) => {

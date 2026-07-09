@@ -1,10 +1,12 @@
-import { Body, Controller, Get, HttpCode, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
   ApiBearerAuth,
   ApiCreatedResponse,
+  ApiForbiddenResponse,
   ApiOkResponse,
   ApiOperation,
+  ApiParam,
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
@@ -207,6 +209,17 @@ export class OrderController {
   })
   listAdmin(@Query() query: PaginationQuery) {
     return this.orderService.listForAdmin(query.page, query.pageSize, query.locale);
+  }
+
+  @Patch(':orderId/cancel')
+  @Role(UserRole.ADMIN)
+  @ApiOperation({ summary: 'Cancel an order (admin only)' })
+  @ApiParam({ name: 'orderId', example: '7e9f2d3b-1234-4abc-9d8e-2c4f6a1b3c5d' })
+  @ApiOkResponse({ description: 'Cancelled order', schema: { example: { ...orderExample, status: 'cancelled' } } })
+  @ApiBadRequestResponse({ description: 'Order not found, or already cancelled/done' })
+  @ApiForbiddenResponse({ description: 'Caller is not an admin' })
+  cancel(@Param('orderId', ParseUUIDPipe) orderId: string, @Query() query: BasicQuery) {
+    return this.orderService.cancelOrder(orderId, query.locale);
   }
 
   @Post('handle-order')
