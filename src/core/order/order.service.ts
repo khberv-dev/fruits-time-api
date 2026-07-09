@@ -2,7 +2,6 @@ import { BadRequestException, Injectable, InternalServerErrorException, Logger }
 import { InjectRepository } from '@nestjs/typeorm';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { In, Repository } from 'typeorm';
-import dayjs from 'dayjs';
 import { Order } from '@/shared/entities/order.entity';
 import { Product } from '@/shared/entities/product.entity';
 import { User } from '@/shared/entities/user.entity';
@@ -467,8 +466,7 @@ export class OrderService {
   }
 
   // Every minute: look up every CREATED ("new") order, check which ones now show up as a
-  // POS transaction, and either accept + dispatch them or — for deliveries older than 10
-  // minutes that staff never accepted — cancel them.
+  // POS transaction, and accept + dispatch them.
   @Cron(CronExpression.EVERY_MINUTE)
   async processPosAcceptance(): Promise<void> {
     const newOrders = await this.orderRepo.find({
@@ -479,31 +477,27 @@ export class OrderService {
 
     const acceptedIds = await this.posterService.getTransactions();
     const accepted = new Set(acceptedIds);
-    const now = dayjs();
 
     for (const order of newOrders) {
-      if (order.posId !== null && accepted.has(order.posId)) {
-        await this.orderRepo.update(order.id, { status: OrderStatus.ACCEPTED });
-        this.logger.log(`processPosAcceptance: order ${order.id} accepted in POS`);
+      if (order.posId === null || !accepted.has(order.posId)) continue;
 
-        const session = await this.sessionRepo.findOne({ where: { user: { id: order.user.id } } });
-        if (session?.fcmToken) {
-          await this.pushService.send(session.fcmToken, 'Fruits Time', 'Buyurtmangiz qabul qilindi');
-        }
+      await this.orderRepo.update(order.id, { status: OrderStatus.ACCEPTED });
+      this.logger.log(`processPosAcceptance: order ${order.id} accepted in POS`);
 
-        if (order.type === OrderType.DELIVERY && order.deliveryPayload) {
-          this.logger.log(`processPosAcceptance: creating delivery service order for order ${order.id}`);
-          const ok = await this.deliveryService.createOrder(order.deliveryPayload);
-          if (ok) {
-            await this.orderRepo.update(order.id, { deliveryPayload: null });
-            this.logger.log(`processPosAcceptance: dispatched delivery for order ${order.id}`);
-          } else {
-            this.logger.error(`processPosAcceptance: delivery dispatch failed for order ${order.id}`);
-          }
+      const session = await this.sessionRepo.findOne({ where: { user: { id: order.user.id } } });
+      if (session?.fcmToken) {
+        await this.pushService.send(session.fcmToken, 'Fruits Time', 'Buyurtmangiz qabul qilindi');
+      }
+
+      if (order.type === OrderType.DELIVERY && order.deliveryPayload) {
+        this.logger.log(`processPosAcceptance: creating delivery service order for order ${order.id}`);
+        const ok = await this.deliveryService.createOrder(order.deliveryPayload);
+        if (ok) {
+          await this.orderRepo.update(order.id, { deliveryPayload: null });
+          this.logger.log(`processPosAcceptance: dispatched delivery for order ${order.id}`);
+        } else {
+          this.logger.error(`processPosAcceptance: delivery dispatch failed for order ${order.id}`);
         }
-      } else if (order.type === OrderType.DELIVERY && now.diff(order.createdAt, 'minute') > 10) {
-        await this.orderRepo.update(order.id, { status: OrderStatus.CANCELLED, deliveryPayload: null });
-        this.logger.log(`processPosAcceptance: cancelled order ${order.id} — not accepted in POS within 10 minutes`);
       }
     }
   }
