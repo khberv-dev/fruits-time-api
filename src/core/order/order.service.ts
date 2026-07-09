@@ -505,6 +505,7 @@ export class OrderService {
         }
 
         if (order.type === OrderType.DELIVERY && order.deliveryPayload) {
+          this.logger.log(`processPosAcceptance: creating delivery service order for order ${order.id}`);
           const ok = await this.deliveryService.createOrder(order.deliveryPayload);
           if (ok) {
             await this.orderRepo.update(order.id, { deliveryPayload: null });
