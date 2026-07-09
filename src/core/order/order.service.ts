@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, InternalServerErrorException, Logger }
 import { InjectRepository } from '@nestjs/typeorm';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { In, LessThan, Repository } from 'typeorm';
+import dayjs from 'dayjs';
 import { Order } from '@/shared/entities/order.entity';
 import { Product } from '@/shared/entities/product.entity';
 import { User } from '@/shared/entities/user.entity';
@@ -492,7 +493,7 @@ export class OrderService {
 
     const acceptedIds = await this.posterService.getTransactions();
     const accepted = new Set(acceptedIds);
-    const cutoff = new Date(Date.now() - 10 * 60 * 1000);
+    const now = dayjs();
 
     for (const order of newOrders) {
       if (order.posId !== null && accepted.has(order.posId)) {
@@ -514,7 +515,7 @@ export class OrderService {
             this.logger.error(`processPosAcceptance: delivery dispatch failed for order ${order.id}`);
           }
         }
-      } else if (order.type === OrderType.DELIVERY && order.createdAt < cutoff) {
+      } else if (order.type === OrderType.DELIVERY && now.diff(order.createdAt, 'minute') > 10) {
         await this.orderRepo.update(order.id, { status: OrderStatus.CANCELLED, deliveryPayload: null });
         this.logger.log(`processPosAcceptance: cancelled order ${order.id} — not accepted in POS within 10 minutes`);
       }
