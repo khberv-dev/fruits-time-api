@@ -42,7 +42,7 @@ export interface ProductPromotion {
 
 const LOYALTY_INTERVAL = 10;
 const BUY_TWO_GET_ONE_INTERVAL = 3;
-const FREE_DELIVERY_DISCOUNT_AMOUNT = 22_000;
+const FREE_DELIVERY_DISCOUNT_AMOUNT = 15_000;
 
 const PROMOTION_NAMES: Record<PromotionType, string> = {
   [PromotionType.FIRST_ORDER_FIRST_ITEM]: 'Birinchi buyurtma uchun chegirma',
@@ -60,12 +60,19 @@ export class PromotionService implements OnApplicationBootstrap {
   // (and, for product-scoped promotions, which products it applies to).
   private readonly handlers: Record<
     PromotionType,
-    (promotion: Promotion, userId: string, items: OrderItemInput[]) => Promise<ItemDiscount[]>
+    (
+      promotion: Promotion,
+      userId: string,
+      items: OrderItemInput[],
+      excludedProductIds: Set<string>,
+    ) => Promise<ItemDiscount[]>
   > = {
-    [PromotionType.FIRST_ORDER_FIRST_ITEM]: (promotion, userId, items) =>
-      this.firstOrderFirstItemDiscount(userId, items),
-    [PromotionType.LOYALTY_EVERY_10TH_ITEM]: (promotion, userId, items) => this.loyaltyDiscount(userId, items),
-    [PromotionType.BUY_TWO_GET_ONE_FREE]: (promotion, userId, items) => this.buyTwoGetOneFreeDiscount(promotion, items),
+    [PromotionType.FIRST_ORDER_FIRST_ITEM]: (promotion, userId, items, excludedProductIds) =>
+      this.firstOrderFirstItemDiscount(userId, items, excludedProductIds),
+    [PromotionType.LOYALTY_EVERY_10TH_ITEM]: (promotion, userId, items, excludedProductIds) =>
+      this.loyaltyDiscount(userId, items, excludedProductIds),
+    [PromotionType.BUY_TWO_GET_ONE_FREE]: (promotion, userId, items, excludedProductIds) =>
+      this.buyTwoGetOneFreeDiscount(promotion, items, excludedProductIds),
     // Affects the delivery quote, not order items — see getDeliveryDiscount().
     [PromotionType.FREE_DELIVERY_3KM]: () => Promise.resolve([]),
   };
@@ -105,7 +112,9 @@ export class PromotionService implements OnApplicationBootstrap {
   // "2+1": the customer only adds the units they're paying for; we top up the cart with
   // the free unit(s) automatically instead of requiring them to add it themselves. Every
   // 2 paid units of an eligible product earns 1 free unit (e.g. 2 -> 3, 4 -> 6, 5 -> 6).
-  async applyAutoAddedItems(items: OrderItemInput[]): Promise<OrderItemInput[]> {
+  // Vitamin-type products never get any promotion discount, defensively excluded here too
+  // in case an admin adds one to this promotion's product list by mistake.
+  async applyAutoAddedItems(items: OrderItemInput[], excludedProductIds: Set<string>): Promise<OrderItemInput[]> {
     const promotion = await this.promotionRepo.findOne({
       where: { type: PromotionType.BUY_TWO_GET_ONE_FREE, isActive: true },
     });
@@ -115,19 +124,24 @@ export class PromotionService implements OnApplicationBootstrap {
     const paidGroupSize = BUY_TWO_GET_ONE_INTERVAL - 1;
 
     return items.map((item) => {
-      if (!eligibleProductIds.has(item.productId)) return item;
+      if (!eligibleProductIds.has(item.productId) || excludedProductIds.has(item.productId)) return item;
 
       const freeUnits = Math.floor(item.quantity / paidGroupSize);
       return freeUnits > 0 ? { ...item, quantity: item.quantity + freeUnits } : item;
     });
   }
 
-  async computeItemDiscounts(userId: string, items: OrderItemInput[]): Promise<ItemDiscount[]> {
+  // `excludedProductIds` (vitamin-type products) never receive any promotion discount.
+  async computeItemDiscounts(
+    userId: string,
+    items: OrderItemInput[],
+    excludedProductIds: Set<string>,
+  ): Promise<ItemDiscount[]> {
     const activePromotions = await this.promotionRepo.find({ where: { isActive: true } });
     if (!activePromotions.length) return [];
 
     const results = await Promise.all(
-      activePromotions.map((promotion) => this.handlers[promotion.type](promotion, userId, items)),
+      activePromotions.map((promotion) => this.handlers[promotion.type](promotion, userId, items, excludedProductIds)),
     );
 
     return results.flat();
@@ -135,11 +149,18 @@ export class PromotionService implements OnApplicationBootstrap {
 
   // A flat amount knocked off the computed delivery price ("first 3km free"): fully covers
   // deliveries cheaper than the amount, otherwise just subtracts it. Callers clamp at 0.
-  async getDeliveryDiscount(): Promise<DeliveryDiscount | null> {
+  // Withheld on the customer's first order — "first" here means no prior *successful*
+  // (DONE) order exists yet, not just "no prior order", so cancelled orders don't count.
+  async getDeliveryDiscount(userId: string): Promise<DeliveryDiscount | null> {
     const promotion = await this.promotionRepo.findOne({
       where: { type: PromotionType.FREE_DELIVERY_3KM, isActive: true },
     });
     if (!promotion) return null;
+
+    const hasSuccessfulOrder = await this.orderRepo.count({
+      where: { user: { id: userId }, status: OrderStatus.DONE },
+    });
+    if (hasSuccessfulOrder === 0) return null;
 
     return { name: PROMOTION_NAMES[PromotionType.FREE_DELIVERY_3KM], amount: FREE_DELIVERY_DISCOUNT_AMOUNT };
   }
@@ -184,16 +205,27 @@ export class PromotionService implements OnApplicationBootstrap {
     };
   }
 
-  private async firstOrderFirstItemDiscount(userId: string, items: OrderItemInput[]): Promise<ItemDiscount[]> {
-    if (items.length === 0) return [];
+  private async firstOrderFirstItemDiscount(
+    userId: string,
+    items: OrderItemInput[],
+    excludedProductIds: Set<string>,
+  ): Promise<ItemDiscount[]> {
+    const itemIndex = items.findIndex((item) => !excludedProductIds.has(item.productId));
+    if (itemIndex === -1) return [];
 
     const isFirstOrder = (await this.orderRepo.count({ where: { user: { id: userId } } })) === 0;
-    return isFirstOrder ? [{ itemIndex: 0, type: PromotionType.FIRST_ORDER_FIRST_ITEM, discountPercent: 30 }] : [];
+    return isFirstOrder ? [{ itemIndex, type: PromotionType.FIRST_ORDER_FIRST_ITEM, discountPercent: 30 }] : [];
   }
 
-  private async loyaltyDiscount(userId: string, items: OrderItemInput[]): Promise<ItemDiscount[]> {
+  private async loyaltyDiscount(
+    userId: string,
+    items: OrderItemInput[],
+    excludedProductIds: Set<string>,
+  ): Promise<ItemDiscount[]> {
     const priorCount = await this.getLifetimeItemCount(userId);
-    const quantities = items.map((item) => item.quantity);
+    // Excluded (vitamin) items neither count towards the cumulative "every 10th" tally
+    // nor can they ever be the free one, so they're treated as zero quantity here.
+    const quantities = items.map((item) => (excludedProductIds.has(item.productId) ? 0 : item.quantity));
 
     return this.computeFreeUnitsPerItem(priorCount, quantities)
       .map((freeUnits, itemIndex) => ({ itemIndex, type: PromotionType.LOYALTY_EVERY_10TH_ITEM, freeUnits }))
@@ -202,7 +234,11 @@ export class PromotionService implements OnApplicationBootstrap {
 
   // Every 3rd unit of an eligible product is free, counted across the whole order (not
   // per cart line), so splitting the same product across two cart entries still works.
-  private buyTwoGetOneFreeDiscount(promotion: Promotion, items: OrderItemInput[]): Promise<ItemDiscount[]> {
+  private buyTwoGetOneFreeDiscount(
+    promotion: Promotion,
+    items: OrderItemInput[],
+    excludedProductIds: Set<string>,
+  ): Promise<ItemDiscount[]> {
     const eligibleProductIds = new Set(promotion.productIds ?? []);
     if (eligibleProductIds.size === 0) return Promise.resolve([]);
 
@@ -210,7 +246,7 @@ export class PromotionService implements OnApplicationBootstrap {
     const discounts: ItemDiscount[] = [];
 
     items.forEach((item, itemIndex) => {
-      if (!eligibleProductIds.has(item.productId)) return;
+      if (!eligibleProductIds.has(item.productId) || excludedProductIds.has(item.productId)) return;
 
       let cumulative = cumulativeByProduct.get(item.productId) ?? 0;
       let freeUnits = 0;

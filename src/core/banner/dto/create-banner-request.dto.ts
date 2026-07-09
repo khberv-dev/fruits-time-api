@@ -1,4 +1,5 @@
-import { IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { IsBoolean, IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { Transform } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateBannerRequest {
@@ -30,4 +31,10 @@ export class CreateBannerRequest {
   })
   @IsOptional()
   thumbnail: any;
+
+  @ApiPropertyOptional({ example: false, description: 'Show this banner as a popup. Defaults to false' })
+  @IsOptional()
+  @IsBoolean()
+  @Transform((params) => params.value.toString() === 'true')
+  popup?: boolean;
 }

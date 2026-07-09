@@ -27,6 +27,7 @@ const bannerExample = {
   title: 'Summer sale',
   content: 'Up to 30% off all juices through July.',
   isActive: true,
+  popup: false,
   createdAt: '2025-06-01T00:00:00.000Z',
   updatedAt: '2025-06-01T00:00:00.000Z',
 };

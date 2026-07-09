@@ -17,6 +17,7 @@ import { DeliveryService } from '@/core/delivery/delivery.service';
 import { PushService } from '@/core/notify/push.service';
 import { OrderType } from '@/shared/enums/order-type.enum';
 import { OrderStatus } from '@/shared/enums/order-status.enum';
+import { ProductType } from '@/shared/enums/product-type.enum';
 import { computeUserStatus, getStatusDiscount } from '@/core/user/user.service';
 import { DeliveryCreateOrderInput } from '@/core/delivery/types/delivery-create-order-input.type';
 import { DeliveryWebhookBody } from '@/core/delivery/types/delivery-webhook-body.type';
@@ -280,8 +281,9 @@ export class OrderService {
   // Shared by create() and evaluate(): validates the branch/products/address and
   // computes per-line pricing (referral-tier + promotion discounts, delivery quote).
   private async prepareOrder(userId: string, locale: Locale, data: CreateOrderRequest): Promise<PreparedOrder> {
-    const items = await this.promotionService.applyAutoAddedItems(data.items);
-    const productIds = [...new Set(items.map((item) => item.productId))];
+    // The set of distinct products is unaffected by 2+1 auto-add (only quantities change),
+    // so products can be fetched from the raw request items before that step runs.
+    const productIds = [...new Set(data.items.map((item) => item.productId))];
 
     const products = await this.productRepo.find({ where: { id: In(productIds), isActive: true } });
     const branch = await this.branchRepo.findOne({ where: { id: data.branchId, isActive: true } });
@@ -309,6 +311,14 @@ export class OrderService {
       }
     }
 
+    const productById = new Map(products.map((product) => [product.id, product]));
+    // Vitamins never get any promotion discount (referral/status discount still applies).
+    const vitaminProductIds = new Set(
+      products.filter((product) => product.type === ProductType.VITAMIN).map((product) => product.id),
+    );
+
+    const items = await this.promotionService.applyAutoAddedItems(data.items, vitaminProductIds);
+
     let savedAddress: Address | null = null;
     if (data.addressId) {
       savedAddress = await this.addressRepo.findOne({
@@ -330,7 +340,7 @@ export class OrderService {
     const referralCount = await this.userRepo.count({ where: { referredBy: { id: userId } } });
     const discountPercent = getStatusDiscount(computeUserStatus(referralCount));
 
-    const itemDiscounts = await this.promotionService.computeItemDiscounts(userId, items);
+    const itemDiscounts = await this.promotionService.computeItemDiscounts(userId, items, vitaminProductIds);
     const promoByIndex = aggregatePromoByIndex(itemDiscounts);
 
     // Combines the referral-tier discount with any promotion for this line: promo-free
@@ -343,8 +353,6 @@ export class OrderService {
     };
     const getItemUnitPrice = (index: number, unitPrice: number, quantity: number): number =>
       quantity > 0 ? Math.round(getItemLinePrice(index, unitPrice, quantity) / quantity) : 0;
-
-    const productById = new Map(products.map((product) => [product.id, product]));
 
     let deliveryInput: DeliveryCreateOrderInput | null = null;
     let deliveryCost: number | undefined;
@@ -393,7 +401,7 @@ export class OrderService {
       deliveryCost = evaluated;
 
       // "3km free delivery": flat amount off the quote, floored at 0 rather than going negative.
-      const discount = await this.promotionService.getDeliveryDiscount();
+      const discount = await this.promotionService.getDeliveryDiscount(userId);
       if (discount) {
         const amount = Math.min(deliveryCost, discount.amount);
         deliveryCost -= amount;

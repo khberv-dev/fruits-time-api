@@ -33,6 +33,7 @@ export class BannerService {
       content: { [locale]: data.content },
       image: { [locale]: fileName },
       thumbnail: thumbnailFileName ? { [locale]: thumbnailFileName } : null,
+      popup: data.popup ?? false,
     });
   }
 
@@ -71,6 +72,10 @@ export class BannerService {
 
     if (data.isActive != undefined) {
       banner.isActive = data.isActive;
+    }
+
+    if (data.popup != undefined) {
+      banner.popup = data.popup;
     }
 
     return this.bannerRepo.save(banner);

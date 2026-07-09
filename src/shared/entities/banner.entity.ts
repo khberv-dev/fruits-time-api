@@ -23,6 +23,9 @@ export class Banner {
   @Column({ name: 'is_active', default: false })
   isActive: boolean;
 
+  @Column({ default: false })
+  popup: boolean;
+
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 
