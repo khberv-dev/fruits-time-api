@@ -166,7 +166,8 @@ export class AuthService {
       },
     });
 
-    if (!otp || dayjs(otp.expiresAt).isAfter(now) || otp.attempts > 3) {
+    // if (!otp || dayjs(otp.expiresAt).isAfter(now) || otp.attempts > 3) {
+    if (!otp) {
       throw new BadRequestException('Wrong session ID');
     }
 
