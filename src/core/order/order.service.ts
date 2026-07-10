@@ -317,7 +317,16 @@ export class OrderService {
       products.filter((product) => product.type === ProductType.VITAMIN).map((product) => product.id),
     );
 
-    const items = await this.promotionService.applyAutoAddedItems(data.items, vitaminProductIds);
+    // 2+1, first-order-30%, and free-delivery are mutually exclusive per order (priority in
+    // that order); loyalty is independent and always stacks. Resolve the winner up front,
+    // using the pre-auto-add quantities, so it can gate auto-add/discounts/delivery below.
+    const exclusivePromotion = await this.promotionService.resolveExclusivePromotion(
+      userId,
+      data.items,
+      vitaminProductIds,
+    );
+
+    const items = await this.promotionService.applyAutoAddedItems(data.items, vitaminProductIds, exclusivePromotion);
 
     let savedAddress: Address | null = null;
     if (data.addressId) {
@@ -340,7 +349,12 @@ export class OrderService {
     const referralCount = await this.userRepo.count({ where: { referredBy: { id: userId } } });
     const discountPercent = getStatusDiscount(computeUserStatus(referralCount));
 
-    const itemDiscounts = await this.promotionService.computeItemDiscounts(userId, items, vitaminProductIds);
+    const itemDiscounts = await this.promotionService.computeItemDiscounts(
+      userId,
+      items,
+      vitaminProductIds,
+      exclusivePromotion,
+    );
     const promoByIndex = aggregatePromoByIndex(itemDiscounts);
 
     // Combines the referral-tier discount with any promotion for this line: promo-free
@@ -401,7 +415,7 @@ export class OrderService {
       deliveryCost = evaluated;
 
       // "3km free delivery": flat amount off the quote, floored at 0 rather than going negative.
-      const discount = await this.promotionService.getDeliveryDiscount(userId);
+      const discount = await this.promotionService.getDeliveryDiscount(userId, exclusivePromotion);
       if (discount) {
         const amount = Math.min(deliveryCost, discount.amount);
         deliveryCost -= amount;
