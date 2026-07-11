@@ -1,4 +1,15 @@
-import { Body, Controller, Get, HttpCode, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  Param,
+  ParseUUIDPipe,
+  Patch,
+  Post,
+  Query,
+} from '@nestjs/common';
 import {
   ApiBadRequestResponse,
   ApiBearerAuth,
@@ -156,10 +167,16 @@ export class OrderController {
       'including any units auto-added by a promotion), and the overall total — without persisting anything or ' +
       'contacting the POS.',
   })
+  @IsPublic()
   @ApiOkResponse({ description: 'Order price evaluation', schema: { example: evaluateOrderExample } })
-  @ApiBadRequestResponse({ description: 'One or more products/branch/address are missing or invalid' })
-  @ApiUnauthorizedResponse({ description: 'Missing or invalid access token' })
+  @ApiBadRequestResponse({
+    description: 'Missing/invalid access token, or one or more products/branch/address are missing or invalid',
+  })
   evaluate(@RequestUser() user: ReqUser, @Query() query: BasicQuery, @Body() body: CreateOrderRequest) {
+    if (!user) {
+      throw new BadRequestException('Buyurtmani baholash uchun tizimga kiring');
+    }
+
     return this.orderService.evaluate(user.id, query.locale, body);
   }
 

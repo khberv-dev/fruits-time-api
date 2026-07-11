@@ -184,4 +184,23 @@ export class AuthService {
 
     await this.otpRepo.save(otp);
   }
+
+  // Reuses the send-otp/verify-otp session from an earlier step: the OTP must have been
+  // verified first (verifiedAt set), and its phoneNumber is used to look up the account —
+  // the client never needs to resend the phone number here.
+  async resetPassword(otpId: string, newPassword: string) {
+    const otp = await this.otpRepo.findOne({ where: { id: otpId } });
+
+    if (!otp || !otp.verifiedAt) {
+      throw new BadRequestException('SMS kod tasdiqlanmagan');
+    }
+
+    const user = await this.userRepo.findOne({ where: { phoneNumber: otp.phoneNumber } });
+    if (!user) {
+      throw new BadRequestException('Foydalanuvchi topilmadi');
+    }
+
+    user.password = await encryptPassword(newPassword);
+    await this.userRepo.save(user);
+  }
 }

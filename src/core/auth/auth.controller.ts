@@ -18,6 +18,7 @@ import type { ReqUser } from '@/shared/types/req-user.type';
 import { JwtRefreshGuard } from '@/common/guards/jwt-refresh.guard';
 import { SendOtpRequest } from '@/core/auth/dto/send-otp-request.dto';
 import { VerifyOtpRequest } from '@/core/auth/dto/verify-otp-request.dto';
+import { ResetPasswordRequest } from '@/core/auth/dto/reset-password-request.dto';
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -131,6 +132,27 @@ export class AuthController {
   @ApiBadRequestResponse({ description: 'Wrong session id, expired session, or wrong code' })
   async verifyOtp(@Param('otpId') otpId: string, @Body() body: VerifyOtpRequest) {
     await this.authService.verifyOtp(otpId, body);
+
+    return {
+      status: true,
+    };
+  }
+
+  @Post('reset-password/:otpId')
+  @ApiOperation({
+    summary: 'Set a new password for the phone number behind a verified OTP session',
+    description:
+      'Requires `verify-otp` to have already succeeded for this `otpId`. The phone number is read from the OTP session, not the request body.',
+  })
+  @ApiParam({
+    name: 'otpId',
+    description: 'OTP session id returned by `send-otp`, already confirmed via `verify-otp`',
+    example: 'a3b8e6e0-f6b1-4f6e-8c1e-2d5b7e5e0a11',
+  })
+  @ApiOkResponse({ description: 'Password updated', schema: { example: { status: true } } })
+  @ApiBadRequestResponse({ description: 'OTP session not found/not verified, or no account with that phone number' })
+  async resetPassword(@Param('otpId') otpId: string, @Body() body: ResetPasswordRequest) {
+    await this.authService.resetPassword(otpId, body.password);
 
     return {
       status: true,
