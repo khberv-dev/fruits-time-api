@@ -46,10 +46,10 @@ const FREE_DELIVERY_DISCOUNT_AMOUNT = 15_000;
 
 // Only one of these ever applies to a given order — the first one (in this order) that
 // would actually have an effect wins, and the rest are skipped entirely for that order.
-// LOYALTY_EVERY_10TH_ITEM is not in this list: it's independent and always stacks on top
-// of whichever of these (if any) wins.
+// BUY_TWO_GET_ONE_FREE and LOYALTY_EVERY_10TH_ITEM are not in this list: 2+1 always applies
+// (to its own eligible products) independent of this check, and loyalty always stacks on
+// top of whichever of these (if any) wins.
 const EXCLUSIVE_PROMOTION_PRIORITY: PromotionType[] = [
-  PromotionType.BUY_TWO_GET_ONE_FREE,
   PromotionType.FIRST_ORDER_FIRST_ITEM,
   PromotionType.FREE_DELIVERY_3KM,
 ];
@@ -120,9 +120,12 @@ export class PromotionService implements OnApplicationBootstrap {
   }
 
   // Determines which (if any) of the mutually-exclusive promotions applies to this order,
-  // by priority: 2+1 > first-order-30% > free-delivery. Eligibility is checked with the
-  // same rules each promotion's own handler uses, just without persisting/mutating
-  // anything, so this can safely run before we know which one "wins".
+  // by priority: first-order-30% > free-delivery (i.e. free-delivery only applies when the
+  // 30% discount didn't). 2+1 is not part of this — it always applies independently, and
+  // its eligible products are carved out of the 30% discount's own eligibility below, since
+  // a product already covered by 2+1 should never also get the 30% discount. Eligibility is
+  // checked with the same rules each promotion's own handler uses, just without
+  // persisting/mutating anything, so this can safely run before we know which one "wins".
   async resolveExclusivePromotion(
     userId: string,
     items: OrderItemInput[],
@@ -130,28 +133,41 @@ export class PromotionService implements OnApplicationBootstrap {
   ): Promise<PromotionType | null> {
     const activePromotions = await this.promotionRepo.find({ where: { isActive: true } });
     const byType = new Map(activePromotions.map((promotion) => [promotion.type, promotion]));
+    const firstOrderExcludedIds = this.withBuyTwoGetOneEligibleIds(excludedProductIds, byType);
 
     for (const type of EXCLUSIVE_PROMOTION_PRIORITY) {
       const promotion = byType.get(type);
       if (!promotion) continue;
 
-      const hasEffect = await this.hasExclusivePromotionEffect(type, promotion, userId, items, excludedProductIds);
+      const hasEffect = await this.hasExclusivePromotionEffect(
+        type,
+        userId,
+        items,
+        type === PromotionType.FIRST_ORDER_FIRST_ITEM ? firstOrderExcludedIds : excludedProductIds,
+      );
       if (hasEffect) return type;
     }
 
     return null;
   }
 
+  // Merges the vitamin exclusion set with whichever products are currently eligible for
+  // 2+1, so callers can exclude both from the 30% discount's eligibility in one place.
+  private withBuyTwoGetOneEligibleIds(
+    excludedProductIds: Set<string>,
+    byType: Map<PromotionType, Promotion>,
+  ): Set<string> {
+    const buyTwoGetOneEligibleIds = byType.get(PromotionType.BUY_TWO_GET_ONE_FREE)?.productIds ?? [];
+    return new Set([...excludedProductIds, ...buyTwoGetOneEligibleIds]);
+  }
+
   private hasExclusivePromotionEffect(
     type: PromotionType,
-    promotion: Promotion,
     userId: string,
     items: OrderItemInput[],
     excludedProductIds: Set<string>,
   ): Promise<boolean> {
     switch (type) {
-      case PromotionType.BUY_TWO_GET_ONE_FREE:
-        return Promise.resolve(this.hasBuyTwoGetOneEffect(promotion, items, excludedProductIds));
       case PromotionType.FIRST_ORDER_FIRST_ITEM:
         return this.hasFirstOrderEffect(userId, items, excludedProductIds);
       case PromotionType.FREE_DELIVERY_3KM:
@@ -159,23 +175,6 @@ export class PromotionService implements OnApplicationBootstrap {
       default:
         return Promise.resolve(false);
     }
-  }
-
-  private hasBuyTwoGetOneEffect(
-    promotion: Promotion,
-    items: OrderItemInput[],
-    excludedProductIds: Set<string>,
-  ): boolean {
-    const eligibleProductIds = new Set(promotion.productIds ?? []);
-    if (eligibleProductIds.size === 0) return false;
-
-    const paidGroupSize = BUY_TWO_GET_ONE_INTERVAL - 1;
-    return items.some(
-      (item) =>
-        eligibleProductIds.has(item.productId) &&
-        !excludedProductIds.has(item.productId) &&
-        Math.floor(item.quantity / paidGroupSize) > 0,
-    );
   }
 
   private async hasFirstOrderEffect(
@@ -201,14 +200,9 @@ export class PromotionService implements OnApplicationBootstrap {
   // "2+1": the customer only adds the units they're paying for; we top up the cart with
   // the free unit(s) automatically instead of requiring them to add it themselves. Every
   // 2 paid units of an eligible product earns 1 free unit (e.g. 2 -> 3, 4 -> 6, 5 -> 6).
-  // Only runs when 2+1 won the cross-promotion exclusivity check (see resolveExclusivePromotion).
-  async applyAutoAddedItems(
-    items: OrderItemInput[],
-    excludedProductIds: Set<string>,
-    exclusivePromotion: PromotionType | null,
-  ): Promise<OrderItemInput[]> {
-    if (exclusivePromotion !== PromotionType.BUY_TWO_GET_ONE_FREE) return items;
-
+  // Always runs when active — 2+1 is not part of the cross-promotion exclusivity check
+  // (see resolveExclusivePromotion), it stacks with whichever of those promotions applies.
+  async applyAutoAddedItems(items: OrderItemInput[], excludedProductIds: Set<string>): Promise<OrderItemInput[]> {
     const promotion = await this.promotionRepo.findOne({
       where: { type: PromotionType.BUY_TWO_GET_ONE_FREE, isActive: true },
     });
@@ -226,8 +220,9 @@ export class PromotionService implements OnApplicationBootstrap {
   }
 
   // `excludedProductIds` (vitamin-type products) never receive any promotion discount.
-  // `exclusivePromotion` gates FIRST_ORDER_FIRST_ITEM/BUY_TWO_GET_ONE_FREE (only the winner
-  // of resolveExclusivePromotion runs); LOYALTY_EVERY_10TH_ITEM always runs when active.
+  // BUY_TWO_GET_ONE_FREE and LOYALTY_EVERY_10TH_ITEM always run when active; FIRST_ORDER_FIRST_ITEM
+  // only runs when it won the cross-promotion exclusivity check (see resolveExclusivePromotion),
+  // and never discounts a product that's eligible for 2+1 (2+1 takes it instead).
   async computeItemDiscounts(
     userId: string,
     items: OrderItemInput[],
@@ -235,14 +230,25 @@ export class PromotionService implements OnApplicationBootstrap {
     exclusivePromotion: PromotionType | null,
   ): Promise<ItemDiscount[]> {
     const activePromotions = await this.promotionRepo.find({ where: { isActive: true } });
+    const byType = new Map(activePromotions.map((promotion) => [promotion.type, promotion]));
     const eligiblePromotions = activePromotions.filter(
-      (promotion) => promotion.type === PromotionType.LOYALTY_EVERY_10TH_ITEM || promotion.type === exclusivePromotion,
+      (promotion) =>
+        promotion.type === PromotionType.LOYALTY_EVERY_10TH_ITEM ||
+        promotion.type === PromotionType.BUY_TWO_GET_ONE_FREE ||
+        promotion.type === exclusivePromotion,
     );
     if (!eligiblePromotions.length) return [];
 
+    const firstOrderExcludedIds = this.withBuyTwoGetOneEligibleIds(excludedProductIds, byType);
+
     const results = await Promise.all(
       eligiblePromotions.map((promotion) =>
-        this.handlers[promotion.type](promotion, userId, items, excludedProductIds),
+        this.handlers[promotion.type](
+          promotion,
+          userId,
+          items,
+          promotion.type === PromotionType.FIRST_ORDER_FIRST_ITEM ? firstOrderExcludedIds : excludedProductIds,
+        ),
       ),
     );
 
@@ -252,8 +258,8 @@ export class PromotionService implements OnApplicationBootstrap {
   // A flat amount knocked off the computed delivery price ("first 3km free"): fully covers
   // deliveries cheaper than the amount, otherwise just subtracts it. Callers clamp at 0.
   // Only applies when free-delivery won the cross-promotion exclusivity check (see
-  // resolveExclusivePromotion) — lowest priority of the three, so 2+1 or the first-order
-  // discount take precedence over it.
+  // resolveExclusivePromotion) — i.e. only when the first-order 30% discount didn't apply.
+  // 2+1 is independent of this check and can apply alongside free delivery.
   async getDeliveryDiscount(
     userId: string,
     exclusivePromotion: PromotionType | null,

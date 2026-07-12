@@ -317,16 +317,18 @@ export class OrderService {
       products.filter((product) => product.type === ProductType.VITAMIN).map((product) => product.id),
     );
 
-    // 2+1, first-order-30%, and free-delivery are mutually exclusive per order (priority in
-    // that order); loyalty is independent and always stacks. Resolve the winner up front,
-    // using the pre-auto-add quantities, so it can gate auto-add/discounts/delivery below.
+    // First-order-30% and free-delivery are mutually exclusive per order (30% takes priority;
+    // free-delivery only applies if 30% didn't). 2+1 and loyalty are independent and always
+    // stack. Resolve the exclusivity winner up front, using the pre-auto-add quantities, so
+    // it can gate the 30% discount/delivery below (2+1's own products are excluded from the
+    // 30% discount's eligibility inside the promotion service).
     const exclusivePromotion = await this.promotionService.resolveExclusivePromotion(
       userId,
       data.items,
       vitaminProductIds,
     );
 
-    const items = await this.promotionService.applyAutoAddedItems(data.items, vitaminProductIds, exclusivePromotion);
+    const items = await this.promotionService.applyAutoAddedItems(data.items, vitaminProductIds);
 
     let savedAddress: Address | null = null;
     if (data.addressId) {
