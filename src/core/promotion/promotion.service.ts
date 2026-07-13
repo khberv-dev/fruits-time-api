@@ -314,16 +314,26 @@ export class PromotionService implements OnApplicationBootstrap {
     };
   }
 
+  // 30% off the full price of every eligible line (i.e. all of them except vitamins and
+  // whatever's covered by 2+1 — see excludedProductIds), not just a single item.
   private async firstOrderFirstItemDiscount(
     userId: string,
     items: OrderItemInput[],
     excludedProductIds: Set<string>,
   ): Promise<ItemDiscount[]> {
-    const itemIndex = items.findIndex((item) => !excludedProductIds.has(item.productId));
-    if (itemIndex === -1) return [];
+    const eligibleIndexes = items
+      .map((_, itemIndex) => itemIndex)
+      .filter((itemIndex) => !excludedProductIds.has(items[itemIndex].productId));
+    if (!eligibleIndexes.length) return [];
 
     const isFirstOrder = (await this.orderRepo.count({ where: { user: { id: userId } } })) === 0;
-    return isFirstOrder ? [{ itemIndex, type: PromotionType.FIRST_ORDER_FIRST_ITEM, discountPercent: 30 }] : [];
+    if (!isFirstOrder) return [];
+
+    return eligibleIndexes.map((itemIndex) => ({
+      itemIndex,
+      type: PromotionType.FIRST_ORDER_FIRST_ITEM,
+      discountPercent: 30,
+    }));
   }
 
   private async loyaltyDiscount(

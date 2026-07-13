@@ -92,7 +92,7 @@ Any external API failure throws an `InternalServerErrorException` and rolls back
 
 `PromotionService` seeds one `Promotion` row per `PromotionType` on bootstrap (`OnApplicationBootstrap`) and admins toggle `isActive`/`productIds` via `PATCH /promotion/:id`. Each type has hardcoded eligibility/discount logic in `handlers`, keyed by type — the DB row only tracks on/off and (for product-scoped types) which products qualify:
 
-- `FIRST_ORDER_FIRST_ITEM` — 30% off the first eligible line item on a customer's very first order.
+- `FIRST_ORDER_FIRST_ITEM` — 30% off the full price of every eligible line item (i.e. all except vitamins and whatever's covered by 2+1) on a customer's very first order.
 - `LOYALTY_EVERY_10TH_ITEM` — every 10th lifetime item (cumulative across orders, cancelled orders excluded) is free.
 - `BUY_TWO_GET_ONE_FREE` ("2+1") — every 3rd unit of an admin-chosen product list is free, cumulative across the whole order. `PromotionService.applyAutoAddedItems` auto-adds the free units to the cart server-side before pricing, rather than requiring the client to add them.
 - `FREE_DELIVERY_3KM` — flat amount knocked off the delivery quote, withheld until the customer has at least one prior `DONE` order.
