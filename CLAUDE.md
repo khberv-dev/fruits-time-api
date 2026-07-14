@@ -118,7 +118,7 @@ Four `@Cron` tasks run continuously:
 | `BranchService.syncSpots` | every 10 min | Upserts branches from Poster `spots.getSpots` by `posId` |
 | `ProductService.syncIngredients` | every 5 min | Fetches ingredient IDs per product from `menu.getProduct` |
 | `ProductService.syncAvailability` | every 10 min | Computes per-branch `available[]` from storage leftovers |
-| `OrderService.processPosAcceptance` | every minute | For every `CREATED` order: if it now shows up as a Poster transaction, marks it `ACCEPTED`, pushes an FCM notification, and (for delivery orders) dispatches the deferred `DeliveryService.createOrder` call. If a `DELIVERY` order is still unaccepted after 10 minutes, cancels it instead. Pickup orders are never auto-cancelled by this job. |
+| `OrderService.processPosAcceptance` | every minute | For every `CREATED` order, branches on type. `DELIVERY`: if it now shows up as a Poster transaction, marks it `ACCEPTED`, pushes an FCM notification, and dispatches the deferred `DeliveryService.createOrder` call; if still unaccepted after 10 minutes, cancels it instead. `PICKUP`: if it shows up as a Poster transaction within 15 minutes of creation, marks it `DONE` directly (no `ACCEPTED` intermediate) and pushes an FCM notification; if still not found after 15 minutes, cancels it. |
 
 `syncAvailability` depends on `ingredients` being populated by `syncIngredients`. Availability is stored as `jsonb ProductAvailability[]` on `Product` (`{ storage_id, left }`).
 

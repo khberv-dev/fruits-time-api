@@ -491,8 +491,10 @@ export class OrderService {
   }
 
   // Every minute: look up every CREATED ("new") order, check which ones now show up as a
-  // POS transaction, and either accept + dispatch them or — for deliveries older than 10
-  // minutes that staff never accepted — cancel them.
+  // POS transaction, and either accept + dispatch them or cancel them if staff never
+  // accepted in time. Pickup orders get a 15-minute window and go straight to DONE (no
+  // separate dispatch step); deliveries get a 10-minute window and go to ACCEPTED, then
+  // dispatch to the delivery service.
   @Cron(CronExpression.EVERY_MINUTE)
   async processPosAcceptance(): Promise<void> {
     const newOrders = await this.orderRepo.find({
@@ -506,7 +508,27 @@ export class OrderService {
     const now = dayjs();
 
     for (const order of newOrders) {
-      if (order.posId !== null && accepted.has(order.posId)) {
+      const isAccepted = order.posId !== null && accepted.has(order.posId);
+
+      if (order.type === OrderType.PICKUP) {
+        if (isAccepted && now.diff(order.createdAt, 'minute') <= 15) {
+          await this.orderRepo.update(order.id, { status: OrderStatus.DONE });
+          this.logger.log(`processPosAcceptance: pickup order ${order.id} done — accepted in POS within 15 minutes`);
+
+          const session = await this.sessionRepo.findOne({ where: { user: { id: order.user.id } } });
+          if (session?.fcmToken) {
+            await this.pushService.send(session.fcmToken, 'Fruits Time', 'Buyurtmangiz olinishga tayyor');
+          }
+        } else if (now.diff(order.createdAt, 'minute') > 15) {
+          await this.orderRepo.update(order.id, { status: OrderStatus.CANCELLED });
+          this.logger.log(
+            `processPosAcceptance: cancelled pickup order ${order.id} — not accepted in POS within 15 minutes`,
+          );
+        }
+        continue;
+      }
+
+      if (isAccepted) {
         await this.orderRepo.update(order.id, { status: OrderStatus.ACCEPTED });
         this.logger.log(`processPosAcceptance: order ${order.id} accepted in POS`);
 
