@@ -24,7 +24,7 @@ export class User {
   @Column({ name: 'phone_number', unique: true })
   phoneNumber: string;
 
-  @Column({ nullable: true })
+  @Column({ type: 'varchar', nullable: true })
   password: string | null;
 
   @Column({ type: 'date', nullable: true })
@@ -55,7 +55,7 @@ export class User {
   @Column({ name: 'pos_id', type: 'int', nullable: true })
   posId: number | null;
 
-  @Column({ name: 'telegram_id', unique: true, nullable: true })
+  @Column({ name: 'telegram_id', type: 'varchar', unique: true, nullable: true })
   telegramId: string | null;
 
   @Column({ type: 'enum', enum: UserRole })
