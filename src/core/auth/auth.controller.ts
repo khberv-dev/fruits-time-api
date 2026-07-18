@@ -3,6 +3,7 @@ import {
   ApiBadRequestResponse,
   ApiBearerAuth,
   ApiConflictResponse,
+  ApiHeader,
   ApiOkResponse,
   ApiOperation,
   ApiParam,
@@ -19,6 +20,8 @@ import { JwtRefreshGuard } from '@/common/guards/jwt-refresh.guard';
 import { SendOtpRequest } from '@/core/auth/dto/send-otp-request.dto';
 import { VerifyOtpRequest } from '@/core/auth/dto/verify-otp-request.dto';
 import { ResetPasswordRequest } from '@/core/auth/dto/reset-password-request.dto';
+import { TelegramSignUpRequest } from '@/core/auth/dto/telegram-sign-up-request.dto';
+import { TelegramBotGuard } from '@/common/guards/telegram-bot.guard';
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -44,6 +47,53 @@ export class AuthController {
   @ApiConflictResponse({ description: 'Phone number already registered' })
   signUp(@Body() body: CreateUserRequest) {
     return this.authService.signUp(body);
+  }
+
+  @Post('telegram/sign-up')
+  @UseGuards(TelegramBotGuard)
+  @ApiHeader({ name: 'x-telegram-bot-secret', description: 'Shared bot secret (TELEGRAM_BOT_SECRET)', required: true })
+  @ApiOperation({
+    summary: 'Register (or link) an account from the Telegram bot',
+    description:
+      'Bot-only endpoint (requires the `x-telegram-bot-secret` header). Skips SMS OTP entirely since the phone ' +
+      "number comes pre-verified from Telegram's own contact-share flow, and creates the account without a " +
+      "password. If the phone number already belongs to an existing account, links that account's telegramId " +
+      'instead of creating a new one. Returns a fresh access/refresh token pair either way.',
+  })
+  @ApiOkResponse({
+    description: 'Account created or linked',
+    schema: {
+      example: {
+        id: '6b0a0e1e-5f55-4a3a-9a9b-3a4f2c8a0c1e',
+        accessToken: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+        refreshToken: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+      },
+    },
+  })
+  @ApiUnauthorizedResponse({ description: 'Missing or invalid bot secret' })
+  @ApiConflictResponse({ description: 'Phone number or telegramId already linked to a different account' })
+  telegramSignUp(@Body() body: TelegramSignUpRequest) {
+    return this.authService.telegramSignUp(body);
+  }
+
+  @Get('telegram/check-phone/:phoneNumber')
+  @UseGuards(TelegramBotGuard)
+  @ApiHeader({ name: 'x-telegram-bot-secret', description: 'Shared bot secret (TELEGRAM_BOT_SECRET)', required: true })
+  @ApiOperation({
+    summary: 'Check whether a phone number is available for Telegram sign-up',
+    description:
+      'Bot-only endpoint (requires the `x-telegram-bot-secret` header). `status: true` means the number is free; ' +
+      '`false` means it is already registered.',
+  })
+  @ApiParam({ name: 'phoneNumber', example: '998901234567', description: '12-digit phone number' })
+  @ApiOkResponse({ schema: { example: { status: true } } })
+  @ApiUnauthorizedResponse({ description: 'Missing or invalid bot secret' })
+  async telegramCheckPhoneNumber(@Param('phoneNumber') phoneNumber: string) {
+    const exists = await this.authService.checkPhoneNumber(phoneNumber);
+
+    return {
+      status: !exists,
+    };
   }
 
   @Post('sign-in')

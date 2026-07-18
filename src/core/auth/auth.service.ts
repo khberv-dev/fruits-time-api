@@ -12,6 +12,7 @@ import { JwtService } from '@nestjs/jwt';
 import { UserRole } from '@/shared/enums/user-role.enum';
 import { ConfigService } from '@nestjs/config';
 import { CreateUserRequest } from '@/core/auth/dto/create-user-request.dto';
+import { TelegramSignUpRequest } from '@/core/auth/dto/telegram-sign-up-request.dto';
 import { encryptPassword, generateReferralCode, randomOTP, validatePassword } from '@/shared/utils/lib';
 import { SignInRequest } from '@/core/auth/dto/sign-in-request.dto';
 import { SendOtpRequest } from '@/core/auth/dto/send-otp-request.dto';
@@ -60,7 +61,7 @@ export class AuthService {
       },
     });
 
-    if (!user) return null;
+    if (!user || !user.password) return null;
 
     const isValidPassword = await validatePassword(password, user.password);
 
@@ -103,6 +104,71 @@ export class AuthService {
       firstName: data.firstName,
       phoneNumber: data.phoneNumber,
       password: passwordHash,
+      role: UserRole.USER,
+      referralCode,
+      referredBy,
+    });
+
+    const posId = await this.posterService.createClient(user.firstName, user.phoneNumber);
+    if (posId !== null) {
+      user.posId = posId;
+      await this.userRepo.save(user);
+      this.logger.log(`Synced ${user.firstName} (${user.phoneNumber}) → posId=${posId}`);
+    } else {
+      this.logger.warn(`Unable sync ${user.firstName} (${user.phoneNumber})`);
+    }
+
+    const tokens = this.issueTokens(user.id, user.role);
+
+    return {
+      id: user.id,
+      ...tokens,
+    };
+  }
+
+  // Phone numbers reach us here already verified by Telegram's own contact-share flow, so
+  // unlike signUp there is no OTP round-trip and no password: the account is authenticated
+  // going forward via telegramId (through the bot) or, if password gets set later, sign-in.
+  async telegramSignUp(data: TelegramSignUpRequest) {
+    const [existingByPhone, existingByTelegramId] = await Promise.all([
+      this.userRepo.findOne({ where: { phoneNumber: data.phoneNumber } }),
+      this.userRepo.findOne({ where: { telegramId: data.telegramId } }),
+    ]);
+
+    if (existingByTelegramId && existingByTelegramId.phoneNumber !== data.phoneNumber) {
+      throw new ConflictException('Bu telegram akkaunt boshqa telefon raqamiga bogʻlangan');
+    }
+
+    if (existingByPhone) {
+      if (existingByPhone.telegramId && existingByPhone.telegramId !== data.telegramId) {
+        throw new ConflictException('Bu telefon raqami boshqa telegram akkauntiga bogʻlangan');
+      }
+
+      if (!existingByPhone.telegramId) {
+        existingByPhone.telegramId = data.telegramId;
+        await this.userRepo.save(existingByPhone);
+      }
+
+      const tokens = this.issueTokens(existingByPhone.id, existingByPhone.role);
+      return { id: existingByPhone.id, ...tokens };
+    }
+
+    let referredBy: User | undefined;
+    if (data.referralCode) {
+      const referrer = await this.userRepo.findOne({ where: { referralCode: data.referralCode } });
+      if (!referrer) {
+        throw new BadRequestException('Referal kod xato');
+      }
+      referredBy = referrer;
+    }
+
+    const referralCode = await this.generateUniqueReferralCode();
+
+    const user = await this.userRepo.save({
+      firstName: data.firstName,
+      phoneNumber: data.phoneNumber,
+      telegramId: data.telegramId,
+      password: null,
       role: UserRole.USER,
       referralCode,
       referredBy,

@@ -25,6 +25,7 @@ Path alias: `@/*` → `src/*` (see `tsconfig.json`). Use this in imports rather 
 - `JWT_ACCESS_SECRET` / `JWT_ACCESS_EXPIRE` / `JWT_REFRESH_SECRET` / `JWT_REFRESH_EXPIRE`.
 - `GENAI_KEY` / `GENAI_MODEL` — Google GenAI (`@google/genai`), used by both the `assistant` and `advisor` modules.
 - `ESKIZ_SMS_*` — Eskiz SMS gateway used to deliver OTPs.
+- `TELEGRAM_BOT_SECRET` — static shared secret the Telegram bot sends as the `x-telegram-bot-secret` header on `/auth/telegram/*` endpoints; checked by `TelegramBotGuard`.
 - `POSTER_API_URL` / `POSTER_API_KEY` — Poster POS integration (branch sync, order creation, client creation).
 - `DELIVERY_API_URL` / `DELIVERY_API_KEY` — Noor delivery service integration.
 - `FIREBASE_SERVICE_ACCOUNT` — JSON string of a Firebase service-account credential; powers FCM push notifications via `firebase-admin`. If absent, `PushService` logs a warning and silently skips all sends.
@@ -52,6 +53,8 @@ Tokens are issued in `AuthService.issueTokens` with `sub` and `role` in the payl
 **OTP verification is currently a no-op check.** `AuthService.verifyOtp` only checks that the `Otp` row exists (`if (!otp) throw ...`); the real guard — expiry and attempt-count (`dayjs(otp.expiresAt).isAfter(now) || otp.attempts > 3`) — is commented out in the source. Any code (`code === data.code`) still has to match, but an expired or already-exhausted OTP row will still verify. Don't assume expiry/attempts are enforced when touching this flow; re-enabling that check is a one-line uncomment if it's ever needed.
 
 In controllers, pull the caller via `@RequestUser() user: ReqUser` (`{ id, role }`). When a route is `@IsPublic()`, `user` may be `undefined` — handle that.
+
+**Telegram bot registration bypasses OTP entirely.** `POST /auth/telegram/sign-up` and `GET /auth/telegram/check-phone/:phoneNumber` sit under the (also `@IsPublic()`) `AuthController` but additionally require `TelegramBotGuard` (`src/common/guards/telegram-bot.guard.ts`), which checks the `x-telegram-bot-secret` header against `TELEGRAM_BOT_SECRET`. The premise is that Telegram's own contact-share flow already gives a verified phone number, so no SMS OTP round-trip is needed. `AuthService.telegramSignUp`: if the phone number already has an account, it links that account's `telegramId` (if unset) and returns tokens for it rather than erroring; a `telegramId` or phone already linked to a *different* account throws `ConflictException`. New accounts are created with `password: null` — `User.password` is nullable specifically for this (telegram-only accounts never sign in via `POST /auth/sign-in`, `AuthService.validateUser` returns `null` for any user with no password). `User.telegramId` (nullable, unique) is otherwise unused by the rest of the app.
 
 ### Database
 
