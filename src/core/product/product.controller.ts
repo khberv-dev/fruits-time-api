@@ -20,6 +20,7 @@ import { uploadFileInterceptor } from '@/common/interceptors/upload-file.interce
 import { UpdateProductRequest } from '@/core/product/dto/update-product-request.dto';
 import { IsPublic } from '@/common/decorators/is_public.decorator';
 import { SearchQuery } from '@/shared/dto/search-query.dto';
+import { PaginatedSearchQuery } from '@/shared/dto/paginated-search-query.dto';
 
 const productExample = {
   id: 'b1d4ee2c-2e9a-4f12-9a8b-3a4d5e6f7a8b',
@@ -63,11 +64,19 @@ export class ProductController {
   @Get('all')
   @Role(UserRole.ADMIN)
   @ApiBearerAuth('access-token')
-  @ApiOperation({ summary: 'List all products in a catalog including inactive (admin only)' })
-  @ApiOkResponse({ description: 'All products', schema: { example: [productExample] } })
+  @ApiOperation({
+    summary: 'List all products in a catalog including inactive (admin only)',
+    description:
+      'Paginated (`page`/`pageSize`, defaults 1/20, capped at 50). Pass `search` to filter by title or compound, ' +
+      'matched case-insensitively against the chosen locale; omit it to list everything in the catalog.',
+  })
+  @ApiOkResponse({
+    description: 'Paginated products',
+    schema: { example: { products: [productExample], total: 87, pages: 5 } },
+  })
   @ApiForbiddenResponse({ description: 'Caller is not an admin' })
-  getAll(@Param('catalogId') catalogId: string, @Query() query: BasicQuery) {
-    return this.productService.findAll(catalogId, query.locale, false);
+  getAll(@Param('catalogId') catalogId: string, @Query() query: PaginatedSearchQuery) {
+    return this.productService.findAllPaginated(catalogId, query.locale, query.page, query.pageSize, query.search);
   }
 
   @Post()

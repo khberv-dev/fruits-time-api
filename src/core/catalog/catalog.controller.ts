@@ -19,6 +19,7 @@ import { CreateCatalogRequest } from '@/core/catalog/dto/create-catalog-request.
 import { uploadFileInterceptor } from '@/common/interceptors/upload-file.interceptor';
 import { UpdateCatalogRequest } from '@/core/catalog/dto/update-catalog-request.dto';
 import { IsPublic } from '@/common/decorators/is_public.decorator';
+import { PaginatedSearchQuery } from '@/shared/dto/paginated-search-query.dto';
 
 const catalogExample = {
   id: 'd7f9b3b4-9a4d-4b56-9b4a-3d2e3f1a0c4f',
@@ -47,11 +48,19 @@ export class CatalogController {
   @Get('all')
   @Role(UserRole.ADMIN)
   @ApiBearerAuth('access-token')
-  @ApiOperation({ summary: 'List all catalogs including inactive (admin only)' })
-  @ApiOkResponse({ description: 'All catalogs', schema: { example: [catalogExample] } })
+  @ApiOperation({
+    summary: 'List all catalogs including inactive (admin only)',
+    description:
+      'Paginated (`page`/`pageSize`, defaults 1/20, capped at 50). Pass `search` to filter by title, matched ' +
+      'case-insensitively against the chosen locale; omit it to list everything.',
+  })
+  @ApiOkResponse({
+    description: 'Paginated catalogs',
+    schema: { example: { catalogs: [catalogExample], total: 42, pages: 3 } },
+  })
   @ApiForbiddenResponse({ description: 'Caller is not an admin' })
-  getAll(@Query() query: BasicQuery) {
-    return this.catalogService.findAll(query.locale, false);
+  getAll(@Query() query: PaginatedSearchQuery) {
+    return this.catalogService.findAllPaginated(query.locale, query.page, query.pageSize, query.search);
   }
 
   @Post()

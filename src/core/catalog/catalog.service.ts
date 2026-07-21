@@ -31,6 +31,40 @@ export class CatalogService {
     }));
   }
 
+  async findAllPaginated(locale: Locale, page: number, pageSize: number, search?: string) {
+    const offset = (page - 1) * pageSize;
+    const term = search?.trim();
+
+    const listQb = this.catalogRepo
+      .createQueryBuilder('c')
+      .leftJoin('c.products', 'p')
+      .addSelect('COUNT(p.id)', 'productsCount');
+
+    const countQb = this.catalogRepo.createQueryBuilder('c');
+
+    if (term) {
+      listQb.where('c.title->>:lang ILIKE :search', { lang: locale, search: `%${term}%` });
+      countQb.where('c.title->>:lang ILIKE :search', { lang: locale, search: `%${term}%` });
+    }
+
+    listQb.groupBy('c.id').orderBy('c.index', 'ASC').offset(offset).limit(pageSize);
+
+    const [{ entities: catalogs, raw }, total] = await Promise.all([
+      listQb.getRawAndEntities<{ productsCount: string }>(),
+      countQb.getCount(),
+    ]);
+
+    return {
+      catalogs: catalogs.map((catalog, index) => ({
+        ...catalog,
+        title: catalog.getTitle(locale),
+        productsCount: Number(raw[index].productsCount),
+      })),
+      total,
+      pages: Math.ceil(total / pageSize),
+    };
+  }
+
   create(locale: Locale, fileName: string, data: CreateCatalogRequest) {
     return this.catalogRepo.save({
       title: { [locale]: data.title },

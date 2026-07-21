@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { Product } from '@/shared/entities/product.entity';
 import { Branch } from '@/shared/entities/branch.entity';
-import { IsNull, Not, Repository } from 'typeorm';
+import { Brackets, IsNull, Not, Repository } from 'typeorm';
 import { Locale } from '@/shared/enums/locale.enum';
 import { CreateProductRequest } from '@/core/product/dto/create-product-request.dto';
 import { UpdateProductRequest } from '@/core/product/dto/update-product-request.dto';
@@ -94,6 +94,44 @@ export class ProductService {
       compound: product.getCompound(locale),
       promotions: promotionsByProduct.get(product.id) ?? [],
     }));
+  }
+
+  async findAllPaginated(catalogId: string, locale: Locale, page: number, pageSize: number, search?: string) {
+    const offset = (page - 1) * pageSize;
+    const term = search?.trim();
+
+    const qb = this.productRepo.createQueryBuilder('p').where('p.catalog_id = :catalogId', { catalogId });
+
+    if (term) {
+      qb.andWhere(
+        new Brackets((qb2) => {
+          qb2.where('p.title->>:lang ILIKE :search', { lang: locale, search: `%${term}%` }).orWhere(
+            `EXISTS (
+                SELECT 1 FROM jsonb_array_elements_text(p.compound->:lang) AS elem
+                WHERE elem ILIKE :search
+              )`,
+            { lang: locale, search: `%${term}%` },
+          );
+        }),
+      );
+    }
+
+    qb.orderBy('p.index', 'ASC').skip(offset).take(pageSize);
+
+    const [products, total] = await qb.getManyAndCount();
+    const promotionsByProduct = await this.promotionService.getProductPromotions(products.map((p) => p.id));
+
+    return {
+      products: products.map((product) => ({
+        ...product,
+        title: product.getTitle(locale),
+        description: product.getDescription(locale),
+        compound: product.getCompound(locale),
+        promotions: promotionsByProduct.get(product.id) ?? [],
+      })),
+      total,
+      pages: Math.ceil(total / pageSize),
+    };
   }
 
   async search(locale: Locale, search: string) {
