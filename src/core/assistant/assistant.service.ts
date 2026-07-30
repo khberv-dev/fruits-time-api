@@ -100,8 +100,10 @@ export class AssistantService implements OnModuleInit {
       { user: { id: userId } as User, role: MessageRole.MODEL, text: responseText },
     ]);
 
-    const suggestions = this.resolveSuggestions(message.suggestions, products, locale);
     const cart = this.resolveCart(message.cart, products);
+    // Cart entries are bare ids; the client resolves them against `suggestions`,
+    // so anything going into the cart must ship its product payload too.
+    const suggestions = this.resolveSuggestions([...(message.suggestions ?? []), ...cart], products, locale);
 
     return { text: message.text ?? '', suggestions, cart };
   }
@@ -126,12 +128,14 @@ export class AssistantService implements OnModuleInit {
         parsed = {};
       }
 
+      const cart = this.resolveCart(parsed.cart, products);
+
       return {
         id: message.id,
         role: message.role,
         text: parsed.text ?? '',
-        suggestions: this.resolveSuggestions(parsed.suggestions, products, locale),
-        cart: this.resolveCart(parsed.cart, products),
+        suggestions: this.resolveSuggestions([...(parsed.suggestions ?? []), ...cart], products, locale),
+        cart,
         createdAt: message.createdAt,
       };
     });
@@ -140,9 +144,7 @@ export class AssistantService implements OnModuleInit {
   private resolveCart(ids: string[] | undefined, products: Product[]): string[] {
     if (!ids?.length) return [];
     const wanted = new Set(ids);
-    return products
-      .filter((p) => wanted.has(p.id) && p.available?.some((a) => a.left))
-      .map((p) => p.id);
+    return products.filter((p) => wanted.has(p.id) && p.available?.some((a) => a.left)).map((p) => p.id);
   }
 
   private resolveSuggestions(ids: string[] | undefined, products: Product[], locale: Locale) {

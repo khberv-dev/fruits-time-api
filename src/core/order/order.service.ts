@@ -144,6 +144,11 @@ export class OrderService {
     ]);
 
     if (!branch) throw new BadRequestException('Filial topilmadi yoki faol emas');
+    // Mirrors prepareOrder's gates so the quote can't promise a fee for a branch that
+    // would reject the order a moment later.
+    if (!branch.isWorking) throw new BadRequestException('Filial hozirda buyurtma qabul qilmayapti');
+    if (!branch.isOpenAt())
+      throw new BadRequestException(`Filial hozir yopiq. Ish vaqti: ${branch.openTime} - ${branch.closeTime}`);
     if (branch.lat === null || branch.long === null) throw new BadRequestException('Filial koordinatalari sozlanmagan');
     if (!branch.address) throw new BadRequestException('Filial manzili sozlanmagan');
     if (!address) throw new BadRequestException('Manzil topilmadi');
@@ -298,6 +303,10 @@ export class OrderService {
 
     if (!branch.isWorking) {
       throw new BadRequestException('Filial hozirda buyurtma qabul qilmayapti');
+    }
+
+    if (!branch.isOpenAt()) {
+      throw new BadRequestException(`Filial hozir yopiq. Ish vaqti: ${branch.openTime} - ${branch.closeTime}`);
     }
 
     if (branch.storageId !== null) {

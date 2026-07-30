@@ -9,11 +9,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `npm run start:prod` — runs `node dist/main`.
 - `npm run lint` — ESLint with `--fix`.
 - `npm run format` — Prettier over `src/` and `test/`.
-- `npm test` — Jest (config in `package.json`, `rootDir: src`, `testRegex: .*\\.spec\\.ts$`).
-- `npm test -- path/to/file.spec.ts` — run a single spec.
-- `npm run test:e2e` — uses `test/jest-e2e.json`.
 - `npm run db:clean` — `typeorm schema:drop` against `src/shared/config/database.config.ts`.
-- `npm run db:seed` — builds then runs `dist/seed.js` to insert the initial admin user from `INIT_ADMIN_LOGIN` / `INIT_ADMIN_PASSWORD`.
+- `npm run db:seed` — builds then runs `dist/seed.js` to insert the initial admin user from `INIT_ADMIN_LOGIN` / `INIT_ADMIN_PASSWORD`. Not idempotent: it does an unconditional `save`, so a second run fails on the `phone_number` unique constraint.
+
+**There is no test suite.** `package.json` carries the stock NestJS Jest wiring (`test`, `test:cov`, `test:e2e`), but no `*.spec.ts` file and no `test/` directory exist — `npm test` exits with "no tests found" and `npm run test:e2e` fails because `test/jest-e2e.json` is missing. If you add the first test, `rootDir` is `src` and `testRegex` is `.*\.spec\.ts$`; run a single file with `npm test -- path/to/file.spec.ts`. `npm run format` also globs a non-existent `test/**/*.ts`.
 
 Path alias: `@/*` → `src/*` (see `tsconfig.json`). Use this in imports rather than relative paths.
 
@@ -46,11 +45,13 @@ NestJS 11 + TypeORM (Postgres) + Passport JWT. `src/main.ts` boots the app with 
 Two global guards are registered as `APP_GUARD` providers in `AppModule` (order matters — JWT runs before role):
 
 1. `JwtAccessGuard` — extends `AuthGuard('jwt-access')`. Routes are protected **by default**. `@IsPublic()` flips behavior to "try to authenticate but always allow"; the request still gets `req.user` if a valid token was present (this is how `AssistantController.ask` distinguishes anonymous vs. logged-in callers).
-2. `RoleGuard` — checks `@Role(UserRole.ADMIN)` metadata. No decorator means any authenticated user passes.
+2. `RoleGuard` — checks `@Role(UserRole.ADMIN)` metadata. No decorator means any authenticated user passes. It reads `req.user.role` unguarded, so never combine `@Role(...)` with `@IsPublic()` on the same route — an anonymous request would throw a `TypeError` (500) instead of a 403.
 
 Tokens are issued in `AuthService.issueTokens` with `sub` and `role` in the payload. Refresh uses a separate secret via `JwtRefreshStrategy` and `JwtRefreshGuard` on the `POST /auth/refresh` endpoint.
 
-**OTP verification is currently a no-op check.** `AuthService.verifyOtp` only checks that the `Otp` row exists (`if (!otp) throw ...`); the real guard — expiry and attempt-count (`dayjs(otp.expiresAt).isAfter(now) || otp.attempts > 3`) — is commented out in the source. Any code (`code === data.code`) still has to match, but an expired or already-exhausted OTP row will still verify. Don't assume expiry/attempts are enforced when touching this flow; re-enabling that check is a one-line uncomment if it's ever needed.
+**OTP verification is currently a no-op check.** `AuthService.verifyOtp` only checks that the `Otp` row exists (`if (!otp) throw ...`); the real guard — expiry and attempt-count (`dayjs(otp.expiresAt).isAfter(now) || otp.attempts > 3`) — is commented out in the source. Any code (`code === data.code`) still has to match, but an expired or already-exhausted OTP row will still verify. Attempt counting is separately broken: a wrong code runs `otp.attempts--` on a column defaulting to `0`, so the counter walks negative and would never trip the commented-out `> 3` test even if it were re-enabled. Don't assume expiry/attempts are enforced when touching this flow.
+
+`POST /auth/reset-password/:otpId` closes the loop: it requires the OTP row to have `verifiedAt` set and reads the phone number off that row, so the client never resends it.
 
 In controllers, pull the caller via `@RequestUser() user: ReqUser` (`{ id, role }`). When a route is `@IsPublic()`, `user` may be `undefined` — handle that.
 
@@ -66,30 +67,50 @@ Three locales (`uz`, `ru`, `en` — `src/shared/enums/locale.enum.ts`). Translat
 
 ### File uploads
 
-`uploadFileInterceptor('<entity>')` writes to `uploads/<entity>/`. Files are served back at `/public/*` via `ServeStaticModule` (configured in `AppModule` with `fallthrough: false`).
+`uploadFileInterceptor('<entity>')` handles a single `file` field and writes to `uploads/<entity>/`; `uploadFileFieldsInterceptor('<entity>', [...])` handles several named single-file fields (banners use it for `file` + `thumbnail`). Files are served back at `/public/*` via `ServeStaticModule` (configured in `AppModule` with `fallthrough: false`).
 
 ### Poster POS integration
 
-`PosterService` wraps the Poster POS REST API (token passed as a query param). `BranchService` runs a `@Cron(EVERY_10_MINUTES)` that calls `getSpots()` and upserts branches by `posId`. Before orders can be placed, both the `User` and each `Product` must have a `posId` set (linking them to Poster clients/products). `PosterService.createClient` is called from `UserService` at registration time to register the user in Poster.
+`PosterService` wraps the Poster POS REST API (token passed as a query param). `BranchService` runs a `@Cron(EVERY_10_MINUTES)` that calls `getSpots()` and upserts branches by `posId`. Before orders can be placed, both the `User` and each `Product` must have a `posId` set (linking them to Poster clients/products); `sendToPoster` throws a 500 if either is missing. `PosterService.createClient` is called from `AuthService.signUp`/`telegramSignUp` at registration time, and `UserService.syncMissingPosIds` retries on every boot for users where it failed.
+
+Every `PosterService`/`DeliveryService` method swallows its own errors — logging and returning `[]`/`null`/`false`/an empty `Map` — so a POS outage degrades silently rather than throwing. Both clients also raise the max-listener cap on their keep-alive agents *and* on freed sockets; don't drop that, it's there to stop `MaxListenersExceededWarning` under socket reuse.
 
 ### Order creation flow
 
-`OrderService.create` runs inside a single TypeORM transaction:
-1. Resolves pricing: referral-tier discount (`computeUserStatus`/`getStatusDiscount`) combined per-item with whatever `PromotionService.computeItemDiscounts` returns (see below for which promotions can actually fire together), taking the max percent and summing free units per line (see `aggregatePromoByIndex`). Vitamin-type products are excluded from all promotions.
-2. Saves the `Order` + `OrderItem` rows with the resolved prices applied.
-3. Calls `DeliveryService.evalOrder` to get the delivery cost (if `type === DELIVERY`), minus any `PromotionService.getDeliveryDiscount`; stores it on the order.
-4. Calls `PosterService.createOrder` to push the order to the POS; stores the returned `posId` on the order.
-5. If `type === DELIVERY`, the actual dispatch to the delivery service is deferred — see the cron below, not done inline here.
+`OrderService.create` first rejects the request if the caller already has a `CREATED` or `ACCEPTED` order ("one active order at a time"), then delegates to the private `prepareOrder`, which is **shared with `evaluate`** and does all validation and pricing *outside* the transaction:
+
+1. Loads the requested products (must all exist and be `isActive`) and the branch (must exist, be `isActive`, have `isWorking: true`, and pass `Branch.isOpenAt()` — see below). If the branch has a `storageId`, every product must show `left: true` for that storage in its `available[]` — otherwise a `BadRequestException` naming the unavailable products.
+2. Resolves which mutually-exclusive promotion wins (`resolveExclusivePromotion`, using pre-auto-add quantities), then runs `applyAutoAddedItems` so 2+1's free units land in the cart server-side.
+3. Resolves pricing: referral-tier discount (`computeUserStatus`/`getStatusDiscount`) combined per-item with whatever `PromotionService.computeItemDiscounts` returns, taking the max percent and summing free units per line (see `aggregatePromoByIndex`). Vitamin-type products are excluded from all promotions. Exposed as the `getItemLinePrice`/`getItemUnitPrice` closures the caller uses for both the DB rows and the POS payload.
+4. For `type === DELIVERY`: requires a saved `addressId`, builds the `DeliveryCreateOrderInput`, quotes it via `DeliveryService.evalOrder`, and subtracts any `PromotionService.getDeliveryDiscount` (clamped at 0).
+
+`create` then opens a single TypeORM transaction that saves the `Order` + `OrderItem` rows, calls `PosterService.createOrder` and stores the returned `posId`, stores `deliveryCost`, and — for delivery orders — parks the delivery payload in `Order.deliveryPayload` (jsonb) instead of dispatching it. Dispatch is deferred to `processPosAcceptance` (see the cron table), which nulls `deliveryPayload` once the delivery service accepts it; `cancelOrder` nulls it too.
+
+`OrderItem` stores **two** line totals, and the names are the opposite of what they suggest: `price` is the discounted amount actually charged, `actualPrice` is the undiscounted `product.price * quantity`. Both are line totals, not unit prices — don't multiply either by `quantity` again.
 
 Any external API failure throws an `InternalServerErrorException` and rolls back the transaction. Both external service methods return `null`/`false` on failure; callers check and throw rather than propagating the raw error.
 
 `POST /order/evaluate` mirrors `create`'s pricing logic (including `productsCount`/`productTypesCount` and a named discount breakdown) without persisting anything or contacting the POS — used by clients to preview price before checkout.
 
-`GET /order/delivery-cost?branchId=&addressId=` is a pre-check endpoint that calls `DeliveryService.evalOrder` without creating an order, so the client can show the delivery fee before checkout.
+`POST /order/evaluate` is marked `@IsPublic()` but throws `BadRequestException` when there's no `req.user` — the decorator is only there so an expired token yields a clean 400 instead of a 401.
+
+`GET /order/delivery-cost?branchId=&addressId=` is a pre-check endpoint that calls `DeliveryService.evalOrder` without creating an order, so the client can show the delivery fee before checkout. It repeats `prepareOrder`'s branch gates (`isActive`, `isWorking`, `isOpenAt()`) so it can't quote a fee for a branch that would then reject the order. Note that the real delivery price always comes from the Noor API — `haversineDistanceKm`/`calculateDeliveryCost` in `shared/utils/lib.ts` are leftovers with no callers.
+
+### Branch working hours
+
+`Branch.openTime`/`closeTime` are nullable bare `HH:mm` strings (validated by regex in `UpdateBranchRequest`, admin-set via `PATCH /branch/:id`) with no timezone attached. `Branch.isOpenAt(at = new Date())` interprets them against **`Asia/Tashkent`** wall-clock time (`BUSINESS_TIMEZONE` in `branch.entity.ts`, via the dayjs `utc`+`timezone` plugins), deliberately not the server's TZ. Semantics:
+
+- Either bound null → always open, so branches without a configured schedule keep working.
+- `open < close` → normal window, inclusive of `openTime` and exclusive of `closeTime`.
+- `close <= open` → the window crosses midnight (`22:00`–`02:00`); identical bounds therefore mean open around the clock.
+
+This is a per-request check only. Nothing writes back to `isWorking`, which stays a purely manual admin toggle — the two gates are independent and both must pass.
+
+`GET /order/active` returns the caller's single `CREATED`/`ACCEPTED` order or `null`; `GET /order` lists their history; `GET /order/admin` is the paginated admin list (adds a trimmed `user` object per order).
 
 `PATCH /order/:orderId/cancel` (admin-only) cancels an order that isn't already `CANCELLED`/`DONE`.
 
-`POST /order/handle-order` (public, no auth) is a webhook endpoint that receives noor.uz delivery stage callbacks. `OrderService.handleDeliveryWebhook` fires-and-forgets `processDeliveryWebhook`, which maps stages 14/15 → `DONE`, sends an FCM push notification, and ignores unrecognized stages.
+`POST /order/handle-order` (public, no auth) is a webhook endpoint that receives noor.uz delivery stage callbacks. `OrderService.handleDeliveryWebhook` fires-and-forgets `processDeliveryWebhook`, which maps stages 14/15 → `DONE` (all other stages leave `status` alone), persists `body.order.link` onto `Order.link` when present, and pushes an FCM notification using the hardcoded Uzbek `DELIVERY_STAGE_MESSAGE` map (stages 1–29 at the top of `order.service.ts`) — stages missing from that map send nothing. These messages are Uzbek-only and ignore `Session.locale`.
 
 ### Promotion module
 
@@ -103,6 +124,8 @@ Any external API failure throws an `InternalServerErrorException` and rolls back
 **Cross-promotion rules:** `BUY_TWO_GET_ONE_FREE` ("2+1") always applies — it is not gated by exclusivity and runs whenever it's active and has eligible products, stacking with everything else. `FIRST_ORDER_FIRST_ITEM` (30%) and `FREE_DELIVERY_3KM` are mutually exclusive with each other, in that priority order: 30% applies if eligible, and free-delivery only applies when 30% did not. `PromotionService.resolveExclusivePromotion` decides that winner up front (checking each type's real eligibility, in priority order, without side effects) and `OrderService.prepareOrder` threads the result into `computeItemDiscounts`/`getDeliveryDiscount`, each of which no-ops for the type that didn't win. Additionally, the 30% discount never lands on a product that's eligible for 2+1 — `PromotionService` excludes 2+1's `productIds` from the 30% discount's own eligibility (both in `resolveExclusivePromotion` and `computeItemDiscounts`), so 2+1 always takes precedence on the products it covers, and 30% only discounts products outside that list. `LOYALTY_EVERY_10TH_ITEM` is **not** part of any of this — it's independent and always stacks on top of whichever (if any) of the above apply.
 
 Vitamin-type products (`excludedProductIds`) never receive any promotion discount, enforced both at the caller (order/evaluate) and defensively inside each handler.
+
+`PromotionService.getProductPromotions` is the read-side counterpart: every product-list response (`findAll`, `findAllPaginated`, `search`) attaches a `promotions: [{ type, name }]` array built from the active *product-scoped* promotions, so the client can badge 2+1 items. Display names are hardcoded Uzbek strings in `PROMOTION_NAMES` — they are not localized through the `Localized<T>` mechanism, and the same is true of the discount names in `evaluate`'s breakdown.
 
 ### User referral / status tiers
 
@@ -118,16 +141,20 @@ Four `@Cron` tasks run continuously:
 
 | Job | Interval | What it does |
 |-----|----------|--------------|
-| `BranchService.syncSpots` | every 10 min | Upserts branches from Poster `spots.getSpots` by `posId` |
+| `BranchService.sync` | every 10 min | Upserts branches from Poster `spots.getSpots` by `posId` (also exposed as admin `POST /branch/sync`) |
 | `ProductService.syncIngredients` | every 5 min | Fetches ingredient IDs per product from `menu.getProduct` |
 | `ProductService.syncAvailability` | every 10 min | Computes per-branch `available[]` from storage leftovers |
 | `OrderService.processPosAcceptance` | every minute | For every `CREATED` order, branches on type. `DELIVERY`: if it now shows up as a Poster transaction, marks it `ACCEPTED`, pushes an FCM notification, and dispatches the deferred `DeliveryService.createOrder` call; if still unaccepted after 10 minutes, cancels it instead. `PICKUP`: if it shows up as a Poster transaction within 15 minutes of creation, marks it `DONE` directly (no `ACCEPTED` intermediate) and pushes an FCM notification; if still not found after 15 minutes, cancels it. |
 
-`syncAvailability` depends on `ingredients` being populated by `syncIngredients`. Availability is stored as `jsonb ProductAvailability[]` on `Product` (`{ storage_id, left }`).
+`syncAvailability` depends on `ingredients` being populated by `syncIngredients`: it prefers "every ingredient has stock left", and only falls back to the product's own `posId` leftover when `ingredients` is null/empty. Availability is stored as `jsonb ProductAvailability[]` on `Product` (`{ storage_id, left }`), one entry per active branch that has a `storageId`.
+
+Two more non-cron background jobs run on bootstrap: `UserService.syncMissingPosIds` (`OnApplicationBootstrap`) backfills `posId` for every user still missing one, and `PromotionService.onApplicationBootstrap` seeds the promotion rows.
 
 ### Assistant vs. Advisor (two separate Gemini-backed chatbots)
 
 Both use `@google/genai` and the same request/response/history pattern (`{ hasAnswer, text }` JSON schema, conversation persisted as `{user, model}` message pairs, `history` endpoint replays and re-parses stored JSON) but serve different audiences:
 
-- **`assistant`** (`src/core/assistant`) — public-facing nutritionist chatbot for customers. `AssistantService.ask` loads active products (60s in-memory cache) and the calling user, builds a system prompt via `InstructionsService.buildNutritionistInstructions`, and additionally supports `suggestions` (product ids to show) and `cart` (product ids to auto-add) in the response schema. `POST /assistant/ask` is `@IsPublic()` and returns a localized "log in" message when `req.user` is missing rather than calling the model.
+- **`assistant`** (`src/core/assistant`) — public-facing nutritionist chatbot for customers. `AssistantService.ask` loads active products (60s in-memory cache) and the calling user, builds a system prompt via `InstructionsService.buildNutritionistInstructions`, and additionally supports `suggestions` (full product payloads to show) and `cart` (product ids to auto-add) in the response schema. `POST /assistant/ask` is `@IsPublic()` and returns a localized "log in" message when `req.user` is missing rather than calling the model.
+
+  Two invariants in `ask`/`history`: `cart` is filtered down to products with stock somewhere (`available.some(a => a.left)`), and `suggestions` is always a **superset of `cart`** — cart entries are bare ids that the client resolves against `suggestions`, so anything in the cart must also ship its product payload. Note the Swagger description claims history is replayed only "within the previous hour"; `loadHistory` has no time or row limit, so the entire conversation is resent to the model on every call and grows unbounded.
 - **`advisor`** (`src/core/advisor`) — admin-only business-analytics chatbot. `AdvisorController` is gated with `@Role(UserRole.ADMIN)`. `AdvisorInstructionsService.buildSnapshot` queries live aggregates (orders by status/type, revenue, top 10 products, branches, active products, last 30 orders) and serializes them into the system prompt on every call, so answers are grounded in current data rather than the model's training knowledge. No product suggestions/cart in the response — just `{ hasAnswer, text }`.
