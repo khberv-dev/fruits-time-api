@@ -1,4 +1,15 @@
-import { ArrayMinSize, IsArray, IsBoolean, IsNotEmpty, IsOptional, IsString, IsUUID } from 'class-validator';
+import {
+  ArrayMinSize,
+  IsArray,
+  IsBoolean,
+  IsInt,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Min,
+} from 'class-validator';
+import { Type } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
 export class UpdateSubscriptionRequest {
@@ -21,6 +32,17 @@ export class UpdateSubscriptionRequest {
   @ArrayMinSize(1)
   @IsUUID('4', { each: true })
   productIds?: string[];
+
+  @ApiPropertyOptional({
+    example: 120,
+    minimum: 0,
+    description: 'Sum a holder may knock off the listed products each day. Takes effect from the next order.',
+  })
+  @IsOptional()
+  @Min(0)
+  @IsInt()
+  @Type(() => Number)
+  discountAmount?: number;
 
   @ApiPropertyOptional({
     example: false,

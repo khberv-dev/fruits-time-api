@@ -81,7 +81,7 @@ Every `PosterService`/`DeliveryService` method swallows its own errors — loggi
 
 1. Loads the requested products (must all exist and be `isActive`) and the branch (must exist, be `isActive`, have `isWorking: true`, and pass `Branch.isOpenAt()` — see below). If the branch has a `storageId`, every product must show `left: true` for that storage in its `available[]` — otherwise a `BadRequestException` naming the unavailable products.
 2. Resolves which mutually-exclusive promotion wins (`resolveExclusivePromotion`, using pre-auto-add quantities), then runs `applyAutoAddedItems` so 2+1's free units land in the cart server-side.
-3. Resolves pricing: referral-tier discount (`computeUserStatus`/`getStatusDiscount`) combined per-item with whatever `PromotionService.computeItemDiscounts` and `SubscriptionService.computeFreeUnits` return, taking the max percent and summing free units per line (see `aggregatePromoByIndex` and `resolveFreeUnits`). Vitamin-type products are excluded from all promotions, but not from subscriptions. Exposed as the `getItemLinePrice`/`getItemUnitPrice` closures the caller uses for both the DB rows and the POS payload.
+3. Resolves pricing: referral-tier discount (`computeUserStatus`/`getStatusDiscount`) combined per-item with whatever `PromotionService.computeItemDiscounts` returns, taking the max percent and summing free units per line (see `aggregatePromoByIndex`), then `SubscriptionService.computeDiscount` subtracts the daily subscription allowance from the resulting covered-line totals. Vitamin-type products are excluded from all promotions, but not from subscriptions. Exposed as the `getItemLinePrice`/`getItemUnitPrice` closures the caller uses for both the DB rows and the POS payload.
 4. For `type === DELIVERY`: requires a saved `addressId`, builds the `DeliveryCreateOrderInput`, quotes it via `DeliveryService.evalOrder`, and subtracts any `PromotionService.getDeliveryDiscount` (clamped at 0).
 
 `create` then opens a single TypeORM transaction that saves the `Order` + `OrderItem` rows, calls `PosterService.createOrder` and stores the returned `posId`, stores `deliveryCost`, and — for delivery orders — parks the delivery payload in `Order.deliveryPayload` (jsonb) instead of dispatching it. Dispatch is deferred to `processPosAcceptance` (see the cron table), which nulls `deliveryPayload` once the delivery service accepts it; `cancelOrder` nulls it too.
@@ -129,17 +129,19 @@ Vitamin-type products (`excludedProductIds`) never receive any promotion discoun
 
 ### Subscription module
 
-A subscription grants its holder **one free unit of each listed product per business-local day** (`DAILY_FREE_UNITS_PER_PRODUCT` in `subscription.service.ts`). Three entities:
+A subscription gives its holder a **fixed sum off the listed products, once per business-local day** (`Subscription.discountAmount`, admin-set). Nothing is free outright: the allowance is pooled across the covered lines and capped by what they cost, so the customer pays any overflow, and it never spills onto products outside the list. With a 120 allowance, a cart of 200 in listed products plus 80 in others totals 160.
 
-- `Subscription` — localized `title`, `productIds` jsonb (same id-array pattern as `Promotion`, not a join table), `isActive`.
+Three entities:
+
+- `Subscription` — localized `title`, `productIds` jsonb (same id-array pattern as `Promotion`, not a join table), `discountAmount`, `isActive`.
 - `SubscriptionCode` — a 36-character code (a `randomUUID()`, so no uniqueness retry loop is needed, unlike `generateReferralCode`). **A redeemed code *is* the user↔subscription link** — there's no separate assignment table. Admins generate codes and hand them out; `POST /subscription/redeem` binds one to the caller. Single-use, but re-redeeming one's own code is idempotent rather than an error.
-- `SubscriptionRedemption` — one row per free unit granted, written inside `OrderService.create`'s transaction. `OrderItem` can't back the quota because it doesn't record *why* a unit was free. Cancelling an order doesn't delete these rows; the quota query skips cancelled orders instead, which hands the allowance back — same trick as `getLifetimeItemCount`.
+- `SubscriptionRedemption` — one row per order recording the sum consumed, written inside `OrderService.create`'s transaction. `OrderItem` can't back the allowance because it doesn't record *which* discount produced a price. Cancelling an order doesn't delete these rows; the allowance query skips cancelled orders instead, which hands the money back — same trick as `getLifetimeItemCount`.
 
-A user may hold several subscriptions; their product lists are unioned and deduped, so overlapping lists still yield one free unit per product per day. Deactivating a subscription withdraws the entitlement from every holder at once without touching their codes, so reactivating restores it.
+A user may hold several subscriptions: their product lists are unioned and their `discountAmount`s summed into one daily budget. Deactivating a subscription withdraws the entitlement from every holder at once without touching their codes, so reactivating restores it.
 
-**Interaction with promotions:** subscription free units are *not* part of `resolveExclusivePromotion` — they stack, like loyalty. They're also **not** vitamin-gated, unlike every promotion, since an admin chose the product list explicitly. `OrderService.resolveFreeUnits` consumes subscription units first and caps promotion free units at `quantity - subscription`, so the two sources can never zero out more than a line's quantity between them; `buildDiscountBreakdown` uses that same function, which is what keeps the named breakdown summing to `discountTotal`.
+**Ordering against other discounts:** the subscription sum applies **last**, against what each covered line would otherwise cost after promotions and the referral tier (`getPromotionalLinePrice` → `computeDiscount` → `getItemLinePrice` in `prepareOrder`). That ordering is what makes the cap meaningful — a line already zeroed by a promotion consumes none of the allowance. Subscriptions are *not* part of `resolveExclusivePromotion` (they stack, like loyalty) and are **not** vitamin-gated, unlike every promotion, since an admin chose the product list explicitly.
 
-`GET /subscription/me` returns the caller's subscriptions plus each covered product's `remainingToday`. Admin routes: `GET /subscription`, `POST /subscription`, `PATCH /subscription/:id` (edit/activate/deactivate), `POST /subscription/:id/codes` (generate N), `GET /subscription/:id/codes` (with redeemer).
+`GET /subscription/me` returns the caller's subscriptions, the covered products, `dailyDiscountAmount`, and `remainingToday`. Admin routes: `GET /subscription`, `POST /subscription`, `PATCH /subscription/:id` (edit/activate/deactivate/set amount), `POST /subscription/:id/codes` (generate N), `GET /subscription/:id/codes` (with redeemer).
 
 ### Business timezone
 

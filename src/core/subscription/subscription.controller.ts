@@ -27,6 +27,7 @@ const subscriptionExample = {
   id: 'c4d5e6f7-8901-2345-bcde-f12345678901',
   title: { uz: 'Kunlik sharbat obunasi' },
   productIds: ['b1d4ee2c-2e9a-4f12-9a8b-3a4d5e6f7a8b'],
+  discountAmount: 120,
   isActive: true,
   createdAt: '2026-07-01T00:00:00.000Z',
   updatedAt: '2026-07-01T00:00:00.000Z',
@@ -41,16 +42,10 @@ const codeExample = {
 };
 
 const mySubscriptionExample = {
-  subscriptions: [{ id: 'c4d5e6f7-8901-2345-bcde-f12345678901', title: 'Kunlik sharbat obunasi' }],
-  products: [
-    {
-      id: 'b1d4ee2c-2e9a-4f12-9a8b-3a4d5e6f7a8b',
-      title: 'Apple Juice',
-      price: 25000,
-      freeUnitsPerDay: 1,
-      remainingToday: 1,
-    },
-  ],
+  subscriptions: [{ id: 'c4d5e6f7-8901-2345-bcde-f12345678901', title: 'Kunlik sharbat obunasi', discountAmount: 120 }],
+  products: [{ id: 'b1d4ee2c-2e9a-4f12-9a8b-3a4d5e6f7a8b', title: 'Apple Juice', price: 25000 }],
+  dailyDiscountAmount: 120,
+  remainingToday: 70,
 };
 
 @ApiTags('Subscription')
@@ -61,13 +56,14 @@ export class SubscriptionController {
   @Get('me')
   @ApiBearerAuth('access-token')
   @ApiOperation({
-    summary: "List the caller's subscriptions and today's remaining free units",
+    summary: "List the caller's subscriptions and today's remaining discount",
     description:
-      "Every product covered by one of the caller's active subscriptions, with `remainingToday` counting down as " +
-      'free units are taken. Resets at midnight Asia/Tashkent. Empty arrays when the caller has no subscription.',
+      "Every product the caller's daily allowance can be spent on, plus `dailyDiscountAmount` (the summed " +
+      'allowance across their active subscriptions) and `remainingToday`, which counts down as orders consume it ' +
+      'and resets at midnight Asia/Tashkent. Zeroes and empty arrays when the caller has no subscription.',
   })
   @ApiOkResponse({
-    description: 'Active subscriptions and covered products',
+    description: 'Active subscriptions, covered products, and the remaining daily allowance',
     schema: { example: mySubscriptionExample },
   })
   @ApiUnauthorizedResponse({ description: 'Missing or invalid access token' })
@@ -107,7 +103,9 @@ export class SubscriptionController {
   @ApiOperation({
     summary: 'Create a subscription (admin only)',
     description:
-      'The title is stored under the requested `locale`. Subscribers get one free unit of each listed product per day.',
+      'The title is stored under the requested `locale`. Holders get `discountAmount` off the listed products ' +
+      'once per day, pooled across those lines — e.g. with a 120 allowance, a cart of 200 in listed products ' +
+      'plus 80 in others totals 160, the customer paying the 80 overflow on the listed ones.',
   })
   @ApiCreatedResponse({ description: 'Created subscription', schema: { example: subscriptionExample } })
   @ApiBadRequestResponse({ description: 'One or more productIds do not exist' })
@@ -122,8 +120,8 @@ export class SubscriptionController {
   @ApiOperation({
     summary: 'Edit, activate, or deactivate a subscription (admin only)',
     description:
-      'Any subset of `title`/`productIds`/`isActive`. Deactivating withdraws the entitlement from every holder ' +
-      'immediately without touching their codes, so reactivating restores it.',
+      'Any subset of `title`/`productIds`/`discountAmount`/`isActive`. Deactivating withdraws the entitlement ' +
+      'from every holder immediately without touching their codes, so reactivating restores it.',
   })
   @ApiParam({ name: 'id', example: 'c4d5e6f7-8901-2345-bcde-f12345678901' })
   @ApiOkResponse({ description: 'Updated subscription', schema: { example: subscriptionExample } })

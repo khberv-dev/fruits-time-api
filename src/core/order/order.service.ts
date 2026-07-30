@@ -22,7 +22,7 @@ import { computeUserStatus, getStatusDiscount } from '@/core/user/user.service';
 import { DeliveryCreateOrderInput } from '@/core/delivery/types/delivery-create-order-input.type';
 import { DeliveryWebhookBody } from '@/core/delivery/types/delivery-webhook-body.type';
 import { DeliveryDiscount, ItemDiscount, OrderItemInput, PromotionService } from '@/core/promotion/promotion.service';
-import { SubscriptionFreeUnits, SubscriptionService } from '@/core/subscription/subscription.service';
+import { SubscriptionDiscount, SubscriptionService } from '@/core/subscription/subscription.service';
 import { PromotionType } from '@/shared/enums/promotion-type.enum';
 
 const DELIVERY_STAGE_MESSAGE: Record<number, string> = {
@@ -102,14 +102,7 @@ function aggregatePromoByIndex(itemDiscounts: ItemDiscount[]): Map<number, Promo
   return map;
 }
 
-// Free units from a subscription are consumed before promotion free units, so the two
-// sources can never zero out more than the line's quantity between them.
-interface LineFreeUnits {
-  subscription: number;
-  promo: number;
-}
-
-const SUBSCRIPTION_DISCOUNT_NAME = "Obuna bo'yicha bepul mahsulot";
+const SUBSCRIPTION_DISCOUNT_NAME = 'Obuna chegirmasi';
 
 interface PreparedOrder {
   items: OrderItemInput[];
@@ -120,8 +113,7 @@ interface PreparedOrder {
   addressSnapshot: Coordinates | null;
   discountPercent: number;
   promoByIndex: Map<number, PromoAggregate>;
-  subscriptionFree: SubscriptionFreeUnits;
-  resolveFreeUnits: (index: number, quantity: number) => LineFreeUnits;
+  subscriptionDiscount: SubscriptionDiscount;
   getItemLinePrice: (index: number, unitPrice: number, quantity: number) => number;
   getItemUnitPrice: (index: number, unitPrice: number, quantity: number) => number;
   deliveryInput: DeliveryCreateOrderInput | null;
@@ -216,7 +208,7 @@ export class OrderService {
       productById,
       promoByIndex,
       discountPercent,
-      prepared.resolveFreeUnits,
+      prepared.subscriptionDiscount.total,
     );
     if (deliveryDiscount) discounts.push(deliveryDiscount);
 
@@ -249,7 +241,7 @@ export class OrderService {
       addressSnapshot,
       deliveryInput,
       deliveryCost,
-      subscriptionFree,
+      subscriptionDiscount,
       getItemLinePrice,
       getItemUnitPrice,
     } = await this.prepareOrder(userId, locale, data);
@@ -282,7 +274,7 @@ export class OrderService {
 
       // Inside the transaction so a POS/delivery failure below rolls the day's allowance
       // back along with the order.
-      await this.subscriptionService.recordRedemptions(manager, userId, order.id, subscriptionFree.byProduct);
+      await this.subscriptionService.recordRedemption(manager, userId, order.id, subscriptionDiscount.total);
 
       order.posId = await this.sendToPoster(
         userId,
@@ -392,25 +384,31 @@ export class OrderService {
     );
     const promoByIndex = aggregatePromoByIndex(itemDiscounts);
 
-    // A subscription hands its holder one free unit per covered product per day. Unlike the
-    // promotions above it isn't product-type gated — the admin picked the list explicitly —
-    // and it stacks rather than joining the exclusivity group.
-    const subscriptionFree = await this.subscriptionService.computeFreeUnits(userId, items);
-
-    const resolveFreeUnits = (index: number, quantity: number): LineFreeUnits => {
-      const subscription = Math.min(subscriptionFree.byIndex.get(index) ?? 0, quantity);
-      const promo = Math.min(promoByIndex.get(index)?.freeUnits ?? 0, quantity - subscription);
-
-      return { subscription, promo };
+    // Combines the referral-tier discount with any promotion for this line: promo-free units
+    // are dropped from the billable quantity, remaining units get the better discount.
+    const getPromotionalLinePrice = (index: number, unitPrice: number, quantity: number): number => {
+      const promo = promoByIndex.get(index);
+      const paidQuantity = Math.max(quantity - (promo?.freeUnits ?? 0), 0);
+      const itemDiscountPercent = Math.max(discountPercent, promo?.discountPercent ?? 0);
+      return applyDiscount(unitPrice * paidQuantity, itemDiscountPercent);
     };
 
-    // Combines the referral-tier discount with any promotion for this line: free units are
-    // dropped from the billable quantity, remaining units get the better discount.
+    // A subscription is a flat daily sum its holder can spend against the covered products.
+    // It applies last, against what each covered line would otherwise cost, so the customer
+    // pays the overflow on anything dearer than the remaining allowance. Unlike the
+    // promotions above it isn't product-type gated — the admin picked the list explicitly —
+    // and it stacks rather than joining the exclusivity group.
+    const subscriptionDiscount = await this.subscriptionService.computeDiscount(
+      userId,
+      items.map((item, index) => ({
+        productId: item.productId,
+        lineTotal: getPromotionalLinePrice(index, productById.get(item.productId)!.price, item.quantity),
+      })),
+    );
+
     const getItemLinePrice = (index: number, unitPrice: number, quantity: number): number => {
-      const free = resolveFreeUnits(index, quantity);
-      const paidQuantity = Math.max(quantity - free.subscription - free.promo, 0);
-      const itemDiscountPercent = Math.max(discountPercent, promoByIndex.get(index)?.discountPercent ?? 0);
-      return applyDiscount(unitPrice * paidQuantity, itemDiscountPercent);
+      const base = getPromotionalLinePrice(index, unitPrice, quantity);
+      return Math.max(base - (subscriptionDiscount.byIndex.get(index) ?? 0), 0);
     };
     const getItemUnitPrice = (index: number, unitPrice: number, quantity: number): number =>
       quantity > 0 ? Math.round(getItemLinePrice(index, unitPrice, quantity) / quantity) : 0;
@@ -479,8 +477,7 @@ export class OrderService {
       addressSnapshot,
       discountPercent,
       promoByIndex,
-      subscriptionFree,
-      resolveFreeUnits,
+      subscriptionDiscount,
       getItemLinePrice,
       getItemUnitPrice,
       deliveryInput,
@@ -496,25 +493,20 @@ export class OrderService {
     productById: Map<string, Product>,
     promoByIndex: Map<number, PromoAggregate>,
     discountPercent: number,
-    resolveFreeUnits: (index: number, quantity: number) => LineFreeUnits,
+    subscriptionAmount: number,
   ): { name: string; amount: number }[] {
     let statusAmount = 0;
-    let subscriptionAmount = 0;
     const promoAmountByType = new Map<PromotionType, number>();
 
     items.forEach((item, index) => {
       const product = productById.get(item.productId)!;
       const promo = promoByIndex.get(index);
-      const free = resolveFreeUnits(index, item.quantity);
-      const paidQuantity = item.quantity - free.subscription - free.promo;
+      const freeUnits = Math.min(promo?.freeUnits ?? 0, item.quantity);
+      const paidQuantity = item.quantity - freeUnits;
 
-      if (free.subscription > 0) {
-        subscriptionAmount += free.subscription * product.price;
-      }
-
-      if (free.promo > 0 && promo?.freeUnitsType) {
+      if (freeUnits > 0 && promo?.freeUnitsType) {
         const type = promo.freeUnitsType;
-        promoAmountByType.set(type, (promoAmountByType.get(type) ?? 0) + free.promo * product.price);
+        promoAmountByType.set(type, (promoAmountByType.get(type) ?? 0) + freeUnits * product.price);
       }
 
       const promoPercent = promo?.discountPercent ?? 0;

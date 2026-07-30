@@ -14,18 +14,23 @@ import { businessDayRange } from '@/shared/utils/lib';
 import { CreateSubscriptionRequest } from '@/core/subscription/dto/create-subscription-request.dto';
 import { UpdateSubscriptionRequest } from '@/core/subscription/dto/update-subscription-request.dto';
 
-// How many units of each listed product a subscriber gets free per business-local day.
-export const DAILY_FREE_UNITS_PER_PRODUCT = 1;
-
 // Codes are 36 characters because they're UUIDs — that gives collision-free generation
 // without a retry loop, unlike the shorter referral codes.
 const CODE_LENGTH = 36;
 
-export interface SubscriptionFreeUnits {
-  // Free units keyed by index into the order's item list.
+// A line of the order the discount can be spent against, priced after every other discount.
+export interface DiscountableLine {
+  productId: string;
+  // Line total after promotions and the referral tier, i.e. what the customer would
+  // otherwise pay for this line.
+  lineTotal: number;
+}
+
+export interface SubscriptionDiscount {
+  // Sum knocked off each line, keyed by index into the order's item list.
   byIndex: Map<number, number>;
-  // Same grant collapsed per product, for writing redemption rows.
-  byProduct: { productId: string; quantity: number }[];
+  // Total consumed, which is what gets written to the ledger.
+  total: number;
 }
 
 @Injectable()
@@ -49,6 +54,7 @@ export class SubscriptionService {
     return this.subscriptionRepo.save({
       title: { [locale]: data.title },
       productIds: data.productIds,
+      discountAmount: data.discountAmount,
       ...(data.isActive !== undefined && { isActive: data.isActive }),
     });
   }
@@ -66,6 +72,10 @@ export class SubscriptionService {
     if (data.productIds) {
       await this.assertProductsExist(data.productIds);
       subscription.productIds = data.productIds;
+    }
+
+    if (data.discountAmount !== undefined) {
+      subscription.discountAmount = data.discountAmount;
     }
 
     if (data.isActive !== undefined) {
@@ -140,97 +150,92 @@ export class SubscriptionService {
     return [...byId.values()];
   }
 
-  private async getEntitledProductIds(userId: string): Promise<Set<string>> {
+  // The covered product list and the daily budget, unioned/summed across every active
+  // subscription the user holds.
+  private async getEntitlement(userId: string): Promise<{ productIds: Set<string>; dailyAmount: number }> {
     const subscriptions = await this.getActiveSubscriptions(userId);
 
-    return new Set(subscriptions.flatMap((subscription) => subscription.productIds ?? []));
+    return {
+      productIds: new Set(subscriptions.flatMap((subscription) => subscription.productIds ?? [])),
+      dailyAmount: subscriptions.reduce((sum, subscription) => sum + subscription.discountAmount, 0),
+    };
   }
 
-  // Units already taken for free today, per product. Cancelled orders are skipped so
-  // cancelling an order returns the day's allowance.
-  private async getUsedToday(userId: string): Promise<Map<string, number>> {
+  // How much of today's allowance is already spent. Cancelled orders are skipped so
+  // cancelling an order returns the money to the day's budget.
+  private async getUsedToday(userId: string): Promise<number> {
     const { start, end } = businessDayRange();
 
-    const rows = await this.redemptionRepo
+    const row = await this.redemptionRepo
       .createQueryBuilder('redemption')
       .innerJoin('redemption.order', 'order')
       .where('redemption.user_id = :userId', { userId })
       .andWhere('order.status != :cancelled', { cancelled: OrderStatus.CANCELLED })
       .andWhere('redemption.created_at >= :start', { start })
       .andWhere('redemption.created_at < :end', { end })
-      .select('redemption.product_id', 'productId')
-      .addSelect('COALESCE(SUM(redemption.quantity), 0)', 'used')
-      .groupBy('redemption.product_id')
-      .getRawMany<{ productId: string; used: string }>();
+      .select('COALESCE(SUM(redemption.amount), 0)', 'used')
+      .getRawOne<{ used: string }>();
 
-    return new Map(rows.map((row) => [row.productId, Number(row.used)]));
+    return Number(row?.used ?? 0);
   }
 
-  // Called by OrderService for both evaluate() (nothing persisted) and create(). Returns no
-  // free units for a caller without an active subscription, which is the common path.
-  async computeFreeUnits(
-    userId: string,
-    items: { productId: string; quantity: number }[],
-  ): Promise<SubscriptionFreeUnits> {
-    const empty: SubscriptionFreeUnits = { byIndex: new Map(), byProduct: [] };
+  async getRemainingToday(userId: string): Promise<number> {
+    const [{ dailyAmount }, used] = await Promise.all([this.getEntitlement(userId), this.getUsedToday(userId)]);
 
-    const entitledProductIds = await this.getEntitledProductIds(userId);
-    if (entitledProductIds.size === 0) return empty;
+    return Math.max(dailyAmount - used, 0);
+  }
 
-    const usedToday = await this.getUsedToday(userId);
+  // Called by OrderService for both evaluate() (nothing persisted) and create(). The budget
+  // is pooled across every covered line rather than allotted per product, and is capped by
+  // what those lines actually cost — it never spills onto products outside the list, so a
+  // cart cheaper than the allowance simply leaves the remainder unused.
+  async computeDiscount(userId: string, lines: DiscountableLine[]): Promise<SubscriptionDiscount> {
+    const empty: SubscriptionDiscount = { byIndex: new Map(), total: 0 };
+
+    const { productIds, dailyAmount } = await this.getEntitlement(userId);
+    if (productIds.size === 0 || dailyAmount <= 0) return empty;
+
+    let remaining = dailyAmount - (await this.getUsedToday(userId));
+    if (remaining <= 0) return empty;
+
     const byIndex = new Map<number, number>();
-    const grantedByProduct = new Map<string, number>();
+    let total = 0;
 
-    items.forEach((item, index) => {
-      if (!entitledProductIds.has(item.productId)) return;
+    lines.forEach((line, index) => {
+      if (remaining <= 0 || !productIds.has(line.productId) || line.lineTotal <= 0) return;
 
-      // Tracked per product rather than per line so the same product split across two cart
-      // entries can't claim the daily allowance twice.
-      const alreadyUsed = (usedToday.get(item.productId) ?? 0) + (grantedByProduct.get(item.productId) ?? 0);
-      const remaining = DAILY_FREE_UNITS_PER_PRODUCT - alreadyUsed;
-      if (remaining <= 0) return;
-
-      const free = Math.min(item.quantity, remaining);
-      byIndex.set(index, free);
-      grantedByProduct.set(item.productId, (grantedByProduct.get(item.productId) ?? 0) + free);
+      // Whatever the line costs beyond the remaining budget is paid normally.
+      const applied = Math.min(line.lineTotal, remaining);
+      byIndex.set(index, applied);
+      remaining -= applied;
+      total += applied;
     });
 
-    if (byIndex.size === 0) return empty;
-
-    return {
-      byIndex,
-      byProduct: [...grantedByProduct].map(([productId, quantity]) => ({ productId, quantity })),
-    };
+    return total > 0 ? { byIndex, total } : empty;
   }
 
   // Runs inside OrderService.create's transaction, so a rolled-back order consumes nothing.
-  async recordRedemptions(
-    manager: EntityManager,
-    userId: string,
-    orderId: string,
-    granted: { productId: string; quantity: number }[],
-  ): Promise<void> {
-    if (!granted.length) return;
+  async recordRedemption(manager: EntityManager, userId: string, orderId: string, amount: number): Promise<void> {
+    if (amount <= 0) return;
 
-    await manager.getRepository(SubscriptionRedemption).save(
-      granted.map((entry) => ({
-        user: { id: userId } as User,
-        product: { id: entry.productId } as Product,
-        order: { id: orderId } as Order,
-        quantity: entry.quantity,
-      })),
-    );
+    await manager.getRepository(SubscriptionRedemption).save({
+      user: { id: userId } as User,
+      order: { id: orderId } as Order,
+      amount,
+    });
   }
 
-  // What the app shows a subscriber: their subscriptions plus today's remaining allowance
-  // for each covered product.
+  // What the app shows a subscriber: their subscriptions, the products the daily allowance
+  // can be spent on, and how much of it is left today.
   async getForUser(userId: string, locale: Locale) {
     const subscriptions = await this.getActiveSubscriptions(userId);
     if (!subscriptions.length) {
-      return { subscriptions: [], products: [] };
+      return { subscriptions: [], products: [], dailyDiscountAmount: 0, remainingToday: 0 };
     }
 
     const productIds = [...new Set(subscriptions.flatMap((subscription) => subscription.productIds ?? []))];
+    const dailyDiscountAmount = subscriptions.reduce((sum, subscription) => sum + subscription.discountAmount, 0);
+
     const [products, usedToday] = await Promise.all([
       productIds.length ? this.productRepo.find({ where: { id: In(productIds) } }) : Promise.resolve([]),
       this.getUsedToday(userId),
@@ -240,15 +245,16 @@ export class SubscriptionService {
       subscriptions: subscriptions.map((subscription) => ({
         id: subscription.id,
         title: subscription.getTitle(locale),
+        discountAmount: subscription.discountAmount,
       })),
       products: products.map((product) => ({
         ...product,
         title: product.getTitle(locale),
         description: product.getDescription(locale),
         compound: product.getCompound(locale),
-        freeUnitsPerDay: DAILY_FREE_UNITS_PER_PRODUCT,
-        remainingToday: Math.max(DAILY_FREE_UNITS_PER_PRODUCT - (usedToday.get(product.id) ?? 0), 0),
       })),
+      dailyDiscountAmount,
+      remainingToday: Math.max(dailyDiscountAmount - usedToday, 0),
     };
   }
 

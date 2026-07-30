@@ -1,12 +1,11 @@
 import { Column, CreateDateColumn, Entity, Index, JoinColumn, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
 import { User } from '@/shared/entities/user.entity';
-import { Product } from '@/shared/entities/product.entity';
 import { Order } from '@/shared/entities/order.entity';
 
-// One row per free unit granted by a subscription, written inside the order transaction.
-// OrderItem alone can't back the daily quota because it doesn't record *why* a unit was
-// free (subscription vs. loyalty vs. 2+1). Rows stay put when an order is cancelled; the
-// quota query skips cancelled orders instead, which hands the allowance back.
+// How much of the daily subscription allowance an order consumed, written inside the order
+// transaction. OrderItem alone can't back the allowance because it doesn't record which
+// discount produced a given price. Rows stay put when an order is cancelled; the allowance
+// query skips cancelled orders instead, which hands the money back.
 @Entity('subscription_redemptions')
 @Index(['user', 'createdAt'])
 export class SubscriptionRedemption {
@@ -17,16 +16,13 @@ export class SubscriptionRedemption {
   @JoinColumn({ name: 'user_id' })
   user: User;
 
-  @ManyToOne(() => Product, { onDelete: 'RESTRICT' })
-  @JoinColumn({ name: 'product_id' })
-  product: Product;
-
   @ManyToOne(() => Order, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'order_id' })
   order: Order;
 
+  // Sum discounted, pooled across every covered line in the order.
   @Column({ type: 'int' })
-  quantity: number;
+  amount: number;
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;

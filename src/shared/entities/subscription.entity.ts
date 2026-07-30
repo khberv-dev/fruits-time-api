@@ -11,10 +11,16 @@ export class Subscription {
   @Column({ type: 'jsonb', default: {} })
   title: Localized<string>;
 
-  // Products a subscriber can take for free each day. Stored as ids rather than a join
+  // Products the daily discount can be spent against. Stored as ids rather than a join
   // table, following the same pattern as Promotion.productIds.
   @Column({ name: 'product_ids', type: 'jsonb', nullable: true, default: null })
   productIds: string[] | null;
+
+  // A fixed sum the holder may knock off the covered products each day. Anything the
+  // covered lines cost beyond this is paid normally, and the amount never spills over
+  // onto products outside the list.
+  @Column({ name: 'discount_amount', type: 'int', default: 0 })
+  discountAmount: number;
 
   @Column({ name: 'is_active', default: true })
   isActive: boolean;

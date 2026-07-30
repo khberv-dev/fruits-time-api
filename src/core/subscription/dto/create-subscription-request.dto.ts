@@ -1,4 +1,15 @@
-import { ArrayMinSize, IsArray, IsBoolean, IsNotEmpty, IsOptional, IsString, IsUUID } from 'class-validator';
+import {
+  ArrayMinSize,
+  IsArray,
+  IsBoolean,
+  IsInt,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Min,
+} from 'class-validator';
+import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateSubscriptionRequest {
@@ -10,12 +21,24 @@ export class CreateSubscriptionRequest {
   @ApiProperty({
     type: [String],
     example: ['b1d4ee2c-2e9a-4f12-9a8b-3a4d5e6f7a8b'],
-    description: 'Products a subscriber can take for free once per day. All ids must exist.',
+    description: 'Products the daily discount can be spent against. All ids must exist.',
   })
   @IsArray()
   @ArrayMinSize(1)
   @IsUUID('4', { each: true })
   productIds: string[];
+
+  @ApiProperty({
+    example: 120,
+    minimum: 0,
+    description:
+      'Sum a holder may knock off the listed products each day. Capped by what those lines cost — anything ' +
+      'beyond it is paid normally, and it never spills onto products outside the list.',
+  })
+  @Min(0)
+  @IsInt()
+  @Type(() => Number)
+  discountAmount: number;
 
   @ApiPropertyOptional({ example: true, default: true, description: 'Whether the subscription is live' })
   @IsOptional()
