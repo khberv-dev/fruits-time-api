@@ -58,7 +58,7 @@ export class AdvisorInstructionsService {
       `ORDERS BY TYPE:`,
       ...ordersByType.map((r) => `  ${r.type}: ${r.count}`),
       '',
-      `REVENUE (completed orders): ${revenue} sum`,
+      `REVENUE (completed orders, amount actually charged after discounts): ${revenue} sum`,
       '',
       `TOP 10 PRODUCTS BY ORDER COUNT:`,
       ...topProducts.map((p, i) => `  ${i + 1}. ${p.title} — ordered ${p.orderCount}x, qty sold: ${p.totalQty}`),
@@ -103,9 +103,12 @@ export class AdvisorInstructionsService {
     return this.orderRepo.query(`SELECT type, COUNT(*)::int AS count FROM orders GROUP BY type ORDER BY count DESC`);
   }
 
+  // order_items.price and .actual_price are both *line* totals (quantity already applied),
+  // so they must never be multiplied by quantity again. `price` is what the customer was
+  // actually charged after discounts; `actual_price` is the pre-discount list total.
   private async getRevenue(): Promise<number> {
     const result: { total: string }[] = await this.orderItemRepo.query(
-      `SELECT COALESCE(SUM(oi.actual_price * oi.quantity), 0)::bigint AS total
+      `SELECT COALESCE(SUM(oi.price), 0)::bigint AS total
        FROM order_items oi
        JOIN orders o ON o.id = oi.order_id
        WHERE o.status = $1`,
@@ -144,7 +147,7 @@ export class AdvisorInstructionsService {
     }[] = await this.orderRepo.query(
       `SELECT o.created_at, o.status, o.type, u.first_name,
               COUNT(oi.id)::int AS item_count,
-              COALESCE(SUM(oi.actual_price * oi.quantity), 0)::int AS total
+              COALESCE(SUM(oi.price), 0)::int AS total
        FROM orders o
        JOIN users u ON u.id = o.user_id
        LEFT JOIN order_items oi ON oi.order_id = o.id

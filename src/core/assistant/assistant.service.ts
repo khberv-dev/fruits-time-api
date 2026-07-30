@@ -1,10 +1,11 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { GoogleGenAI, Type } from '@google/genai';
 import { ConfigService } from '@nestjs/config';
+import dayjs from 'dayjs';
 import { InstructionsService } from '@/core/assistant/instructions.service';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Product } from '@/shared/entities/product.entity';
-import { Repository } from 'typeorm';
+import { MoreThanOrEqual, Repository } from 'typeorm';
 import { Locale } from '@/shared/enums/locale.enum';
 import { UserService } from '@/core/user/user.service';
 import { AssistantMessage } from '@/shared/entities/assistant-message.entity';
@@ -12,6 +13,8 @@ import { MessageRole } from '@/shared/enums/message-role.enum';
 import { User } from '@/shared/entities/user.entity';
 
 const PRODUCTS_TTL_MS = 60_000;
+// Matches the window the endpoint's API docs advertise.
+const CONTEXT_WINDOW_MINUTES = 60;
 
 @Injectable()
 export class AssistantService implements OnModuleInit {
@@ -42,18 +45,22 @@ export class AssistantService implements OnModuleInit {
     return products;
   }
 
-  private async loadHistory(userId: string): Promise<AssistantMessage[]> {
+  // `since` scopes the rows to a recent window for model context; the history endpoint omits
+  // it and returns the full conversation, which is what the client renders.
+  private async loadHistory(userId: string, since?: Date): Promise<AssistantMessage[]> {
     return this.messageRepo.find({
-      where: { user: { id: userId } },
+      where: { user: { id: userId }, ...(since ? { createdAt: MoreThanOrEqual(since) } : {}) },
       order: { createdAt: 'ASC' },
     });
   }
 
   async ask(locale: Locale, userId: string, text: string) {
+    // Only the recent window is replayed as context — resending the entire conversation grew
+    // the request without bound as a user kept chatting.
     const [user, products, history] = await Promise.all([
       this.userService.findById(userId),
       this.getActiveProducts(),
-      this.loadHistory(userId),
+      this.loadHistory(userId, dayjs().subtract(CONTEXT_WINDOW_MINUTES, 'minutes').toDate()),
     ]);
 
     const contents = [

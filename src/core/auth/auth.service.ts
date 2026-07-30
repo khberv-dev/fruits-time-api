@@ -22,6 +22,9 @@ import dayjs from 'dayjs';
 import { SmsService } from '@/core/notify/sms.service';
 import { PosterService } from '@/core/poster/poster.service';
 
+const MAX_OTP_ATTEMPTS = 3;
+const OTP_TTL_MINUTES = 15;
+
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger('Auth Service');
@@ -220,7 +223,9 @@ export class AuthService {
     return this.otpRepo.save({
       phoneNumber: data.phoneNumber,
       code: code,
-      expiresAt: dayjs().add(15, 'minutes'),
+      // .toDate() matters now that expiry is enforced: a Dayjs object reaches the driver as
+      // a non-Date and is only stored correctly by way of string coercion.
+      expiresAt: dayjs().add(OTP_TTL_MINUTES, 'minutes').toDate(),
     });
   }
 
@@ -232,15 +237,23 @@ export class AuthService {
       },
     });
 
-    // if (!otp || dayjs(otp.expiresAt).isAfter(now) || otp.attempts > 3) {
     if (!otp) {
       throw new BadRequestException('Wrong session ID');
+    }
+
+    // Expiry and attempt limiting were previously disabled, which let an expired or
+    // already-exhausted session keep verifying. Kept as separate checks from the !otp case
+    // so the client can tell "unknown session" from "this session is spent".
+    if (dayjs(otp.expiresAt).isBefore(now) || otp.attempts >= MAX_OTP_ATTEMPTS) {
+      throw new BadRequestException('SMS kod eskirgan, qaytadan kod oling');
     }
 
     const isCodeValid = otp.code === data.code;
 
     if (!isCodeValid) {
-      otp.attempts--;
+      // Counts upward from the column's 0 default — this was a decrement, so the counter
+      // ran negative and no limit could ever trigger.
+      otp.attempts++;
       await this.otpRepo.save(otp);
 
       throw new BadRequestException('SMS kod xato');
