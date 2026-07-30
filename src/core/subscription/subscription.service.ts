@@ -33,6 +33,10 @@ export interface SubscriptionDiscount {
   total: number;
 }
 
+// Why a code can or can't be used right now. `inactive` outranks `redeemed_by_you` because
+// it's the more useful thing to tell a holder whose subscription has been switched off.
+export type SubscriptionCodeStatus = 'available' | 'redeemed_by_you' | 'redeemed' | 'inactive';
+
 @Injectable()
 export class SubscriptionService {
   private readonly logger = new Logger(SubscriptionService.name);
@@ -109,12 +113,12 @@ export class SubscriptionService {
 
   // Single-use: binding the caller to the code is what grants the entitlement. Re-redeeming
   // one's own code is a no-op rather than an error, so a retried request stays safe.
-  async redeem(userId: string, code: string): Promise<Subscription> {
+  async redeem(userId: string, code: string, locale: Locale) {
     if (code.length !== CODE_LENGTH) {
       throw new BadRequestException('Kod xato');
     }
 
-    const existing = await this.codeRepo.findOne({ where: { code }, relations: ['subscription', 'user'] });
+    const existing = await this.loadCode(code);
     if (!existing) {
       throw new BadRequestException('Kod topilmadi');
     }
@@ -134,7 +138,57 @@ export class SubscriptionService {
       this.logger.log(`User ${userId} redeemed a code for subscription ${existing.subscription.id}`);
     }
 
-    return existing.subscription;
+    return this.buildCodeView(existing, 'redeemed_by_you', locale);
+  }
+
+  // Look up a code without consuming it, so the client can show what's on offer (and
+  // whether it's still claimable) before the user commits to redeeming.
+  async describeCode(userId: string, code: string, locale: Locale) {
+    const entry = code.length === CODE_LENGTH ? await this.loadCode(code) : null;
+    if (!entry) {
+      throw new NotFoundException('Kod topilmadi');
+    }
+
+    return this.buildCodeView(entry, this.resolveCodeStatus(entry, userId), locale);
+  }
+
+  private loadCode(code: string): Promise<SubscriptionCode | null> {
+    return this.codeRepo.findOne({ where: { code }, relations: ['subscription', 'user'] });
+  }
+
+  private resolveCodeStatus(entry: SubscriptionCode, userId: string): SubscriptionCodeStatus {
+    if (entry.user && entry.user.id !== userId) return 'redeemed';
+    if (!entry.subscription.isActive) return 'inactive';
+    if (entry.user) return 'redeemed_by_you';
+
+    return 'available';
+  }
+
+  // Shared by describeCode and redeem so the client parses one shape either way, with the
+  // product ids resolved and every localized field flattened for the requested locale.
+  private async buildCodeView(entry: SubscriptionCode, status: SubscriptionCodeStatus, locale: Locale) {
+    const { subscription } = entry;
+    const productIds = subscription.productIds ?? [];
+    const products = productIds.length ? await this.productRepo.find({ where: { id: In(productIds) } }) : [];
+
+    return {
+      code: entry.code,
+      subscriptionId: subscription.id,
+      title: subscription.getTitle(locale),
+      discountAmount: subscription.discountAmount,
+      isActive: subscription.isActive,
+      status,
+      products: products.map((product) => this.localizeProduct(product, locale)),
+    };
+  }
+
+  private localizeProduct(product: Product, locale: Locale) {
+    return {
+      ...product,
+      title: product.getTitle(locale),
+      description: product.getDescription(locale),
+      compound: product.getCompound(locale),
+    };
   }
 
   // Every subscription the user has redeemed a code for that is still switched on. A user
@@ -247,12 +301,7 @@ export class SubscriptionService {
         title: subscription.getTitle(locale),
         discountAmount: subscription.discountAmount,
       })),
-      products: products.map((product) => ({
-        ...product,
-        title: product.getTitle(locale),
-        description: product.getDescription(locale),
-        compound: product.getCompound(locale),
-      })),
+      products: products.map((product) => this.localizeProduct(product, locale)),
       dailyDiscountAmount,
       remainingToday: Math.max(dailyDiscountAmount - usedToday, 0),
     };

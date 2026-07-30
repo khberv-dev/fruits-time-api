@@ -141,7 +141,11 @@ A user may hold several subscriptions: their product lists are unioned and their
 
 **Ordering against other discounts:** the subscription sum applies **last**, against what each covered line would otherwise cost after promotions and the referral tier (`getPromotionalLinePrice` → `computeDiscount` → `getItemLinePrice` in `prepareOrder`). That ordering is what makes the cap meaningful — a line already zeroed by a promotion consumes none of the allowance. Subscriptions are *not* part of `resolveExclusivePromotion` (they stack, like loyalty) and are **not** vitamin-gated, unlike every promotion, since an admin chose the product list explicitly.
 
-`GET /subscription/me` returns the caller's subscriptions, the covered products, `dailyDiscountAmount`, and `remainingToday`. Admin routes: `GET /subscription`, `POST /subscription`, `PATCH /subscription/:id` (edit/activate/deactivate/set amount), `POST /subscription/:id/codes` (generate N), `GET /subscription/:id/codes` (with redeemer).
+`GET /subscription/me` returns the caller's subscriptions, the covered products, `dailyDiscountAmount`, and `remainingToday`.
+
+`GET /subscription/code/:code` inspects a code **without consuming it** — covered products, `discountAmount`, and a `status` of `available` / `redeemed_by_you` / `redeemed` / `inactive` (`resolveCodeStatus`; `inactive` deliberately outranks `redeemed_by_you`). `POST /subscription/redeem` returns that same shape via the shared `buildCodeView`, always with `status: 'redeemed_by_you'`, so clients parse one format either way. Both flatten localized fields for the requested locale, unlike the admin routes which return raw entities. Note `describeCode` 404s on an unknown code while `redeem` 400s — the latter keeps the error codes it shipped with.
+
+Admin routes: `GET /subscription`, `POST /subscription`, `PATCH /subscription/:id` (edit/activate/deactivate/set amount), `POST /subscription/:id/codes` (generate N), `GET /subscription/:id/codes` (with redeemer).
 
 ### Business timezone
 

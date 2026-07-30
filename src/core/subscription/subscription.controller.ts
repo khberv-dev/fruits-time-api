@@ -41,6 +41,27 @@ const codeExample = {
   createdAt: '2026-07-01T00:00:00.000Z',
 };
 
+const codeViewExample = {
+  code: '3f2a91c4-5b6e-4d3b-9c2a-1f2c8d3a4e5b',
+  subscriptionId: 'c4d5e6f7-8901-2345-bcde-f12345678901',
+  title: 'Kunlik sharbat obunasi',
+  discountAmount: 120,
+  isActive: true,
+  status: 'available',
+  products: [
+    {
+      id: 'b1d4ee2c-2e9a-4f12-9a8b-3a4d5e6f7a8b',
+      image: '6f1c2a8f-5b6e-4d3b-9c2a-1f2c8d3a4e5b.jpg',
+      title: 'Apple Juice',
+      description: 'Cold-pressed apple juice with no added sugar.',
+      compound: ['vitamin C', 'potassium'],
+      price: 25000,
+      type: 'juice',
+      isActive: true,
+    },
+  ],
+};
+
 const mySubscriptionExample = {
   subscriptions: [{ id: 'c4d5e6f7-8901-2345-bcde-f12345678901', title: 'Kunlik sharbat obunasi', discountAmount: 120 }],
   products: [{ id: 'b1d4ee2c-2e9a-4f12-9a8b-3a4d5e6f7a8b', title: 'Apple Juice', price: 25000 }],
@@ -71,20 +92,45 @@ export class SubscriptionController {
     return this.subscriptionService.getForUser(user.id, query.locale);
   }
 
+  @Get('code/:code')
+  @ApiBearerAuth('access-token')
+  @ApiOperation({
+    summary: 'Inspect a subscription code without redeeming it',
+    description:
+      'Shows what a code is worth before the caller commits to it: the covered products, the daily ' +
+      '`discountAmount`, and a `status` of `available` (free to redeem), `redeemed_by_you` (the caller already ' +
+      'holds it), `redeemed` (claimed by someone else), or `inactive` (its subscription is switched off). ' +
+      'Purely a lookup — nothing is consumed. Returns the same shape as `POST /subscription/redeem`.',
+  })
+  @ApiParam({ name: 'code', example: '3f2a91c4-5b6e-4d3b-9c2a-1f2c8d3a4e5b', description: '36-character code' })
+  @ApiOkResponse({
+    description: 'What the code grants and whether it can still be used',
+    schema: { example: codeViewExample },
+  })
+  @ApiNotFoundResponse({ description: 'No such code' })
+  @ApiUnauthorizedResponse({ description: 'Missing or invalid access token' })
+  describeCode(@RequestUser() user: ReqUser, @Param('code') code: string, @Query() query: BasicQuery) {
+    return this.subscriptionService.describeCode(user.id, code, query.locale);
+  }
+
   @Post('redeem')
   @ApiBearerAuth('access-token')
   @ApiOperation({
     summary: 'Redeem a subscription code',
     description:
       'Binds the 36-character code to the caller, which is what grants the entitlement. Codes are single-use; ' +
-      'redeeming a code the caller already holds succeeds again without consuming anything.',
+      'redeeming a code the caller already holds succeeds again without consuming anything. Returns the same ' +
+      'shape as `GET /subscription/code/{code}`, with `status` set to `redeemed_by_you`.',
   })
-  @ApiOkResponse({ description: 'The subscription the code granted', schema: { example: subscriptionExample } })
+  @ApiOkResponse({
+    description: 'What the code granted',
+    schema: { example: { ...codeViewExample, status: 'redeemed_by_you' } },
+  })
   @ApiBadRequestResponse({ description: 'Code not found, malformed, or its subscription is inactive' })
   @ApiConflictResponse({ description: 'Code already redeemed by a different user' })
   @ApiUnauthorizedResponse({ description: 'Missing or invalid access token' })
-  redeem(@RequestUser() user: ReqUser, @Body() body: RedeemCodeRequest) {
-    return this.subscriptionService.redeem(user.id, body.code);
+  redeem(@RequestUser() user: ReqUser, @Query() query: BasicQuery, @Body() body: RedeemCodeRequest) {
+    return this.subscriptionService.redeem(user.id, body.code, query.locale);
   }
 
   @Get()
