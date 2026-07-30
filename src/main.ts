@@ -34,6 +34,7 @@ async function bootstrap() {
     .addTag('Order', 'User orders with auto-incremented POS id')
     .addTag('Stats', 'Admin dashboard summaries and trend series')
     .addTag('Assistant', 'AI nutritionist chat')
+    .addTag('Subscription', 'Daily free-product subscriptions, redeemed by code')
     .build();
 
   const document = SwaggerModule.createDocument(app, docConfig);

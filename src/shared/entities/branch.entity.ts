@@ -1,15 +1,5 @@
 import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
-import dayjs from 'dayjs';
-import utc from 'dayjs/plugin/utc';
-import timezone from 'dayjs/plugin/timezone';
-
-dayjs.extend(utc);
-dayjs.extend(timezone);
-
-// openTime/closeTime are bare `HH:mm` strings with no timezone attached, and the business
-// runs in a single timezone, so they're resolved against Tashkent wall-clock time instead
-// of the server's — otherwise working hours would silently shift with the deploy host's TZ.
-export const BUSINESS_TIMEZONE = 'Asia/Tashkent';
+import { businessTime } from '@/shared/utils/lib';
 
 function toMinutes(time: string): number {
   const [hours, minutes] = time.split(':');
@@ -63,12 +53,14 @@ export class Branch {
   @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
   updatedAt: Date;
 
-  // A branch with either bound unset has no configured schedule and counts as always open,
-  // so existing branches keep working until an admin sets both times.
+  // openTime/closeTime are bare `HH:mm` strings with no timezone attached, so they're read
+  // as business-local wall-clock time. A branch with either bound unset has no configured
+  // schedule and counts as always open, so existing branches keep working until an admin
+  // sets both times.
   isOpenAt(at: Date = new Date()): boolean {
     if (!this.openTime || !this.closeTime) return true;
 
-    const local = dayjs(at).tz(BUSINESS_TIMEZONE);
+    const local = businessTime(at);
     const current = local.hour() * 60 + local.minute();
     const open = toMinutes(this.openTime);
     const close = toMinutes(this.closeTime);

@@ -21,6 +21,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { SessionModule } from '@/core/session/session.module';
 import { AdvisorModule } from '@/core/advisor/advisor.module';
 import { PromotionModule } from '@/core/promotion/promotion.module';
+import { SubscriptionModule } from '@/core/subscription/subscription.module';
 
 @Module({
   imports: [
@@ -49,6 +50,7 @@ import { PromotionModule } from '@/core/promotion/promotion.module';
     AdvisorModule,
     SessionModule,
     PromotionModule,
+    SubscriptionModule,
   ],
   controllers: [AppController],
   providers: [

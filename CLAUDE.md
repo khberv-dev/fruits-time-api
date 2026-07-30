@@ -36,7 +36,7 @@ NestJS 11 + TypeORM (Postgres) + Passport JWT. `src/main.ts` boots the app with 
 
 ### Module layout
 
-- `src/core/*` — feature modules: `auth`, `user`, `catalog`, `product`, `banner`, `order`, `address`, `branch`, `stats`, `assistant`, `advisor`, `promotion`, `notify`, `poster`, `delivery`, `session`. Each is a self-contained NestJS module with controller/service/dto.
+- `src/core/*` — feature modules: `auth`, `user`, `catalog`, `product`, `banner`, `order`, `address`, `branch`, `stats`, `assistant`, `advisor`, `promotion`, `subscription`, `notify`, `poster`, `delivery`, `session`. Each is a self-contained NestJS module with controller/service/dto.
 - `src/shared/` — cross-cutting code: TypeORM `entities/`, `enums/`, `dto/` (query/pagination/search), `types/`, `utils/lib.ts` (bcrypt + OTP helpers), and `config/database.config.ts` (the single TypeORM `DataSource`).
 - `src/common/` — framework wiring: `guards/` (JWT access/refresh, role), `decorators/` (`@IsPublic`, `@Role`, `@RequestUser`), `pipes/`, and `interceptors/upload-file.interceptor.ts` (multer disk storage at `uploads/<entity>/<uuid><ext>`).
 
@@ -81,7 +81,7 @@ Every `PosterService`/`DeliveryService` method swallows its own errors — loggi
 
 1. Loads the requested products (must all exist and be `isActive`) and the branch (must exist, be `isActive`, have `isWorking: true`, and pass `Branch.isOpenAt()` — see below). If the branch has a `storageId`, every product must show `left: true` for that storage in its `available[]` — otherwise a `BadRequestException` naming the unavailable products.
 2. Resolves which mutually-exclusive promotion wins (`resolveExclusivePromotion`, using pre-auto-add quantities), then runs `applyAutoAddedItems` so 2+1's free units land in the cart server-side.
-3. Resolves pricing: referral-tier discount (`computeUserStatus`/`getStatusDiscount`) combined per-item with whatever `PromotionService.computeItemDiscounts` returns, taking the max percent and summing free units per line (see `aggregatePromoByIndex`). Vitamin-type products are excluded from all promotions. Exposed as the `getItemLinePrice`/`getItemUnitPrice` closures the caller uses for both the DB rows and the POS payload.
+3. Resolves pricing: referral-tier discount (`computeUserStatus`/`getStatusDiscount`) combined per-item with whatever `PromotionService.computeItemDiscounts` and `SubscriptionService.computeFreeUnits` return, taking the max percent and summing free units per line (see `aggregatePromoByIndex` and `resolveFreeUnits`). Vitamin-type products are excluded from all promotions, but not from subscriptions. Exposed as the `getItemLinePrice`/`getItemUnitPrice` closures the caller uses for both the DB rows and the POS payload.
 4. For `type === DELIVERY`: requires a saved `addressId`, builds the `DeliveryCreateOrderInput`, quotes it via `DeliveryService.evalOrder`, and subtracts any `PromotionService.getDeliveryDiscount` (clamped at 0).
 
 `create` then opens a single TypeORM transaction that saves the `Order` + `OrderItem` rows, calls `PosterService.createOrder` and stores the returned `posId`, stores `deliveryCost`, and — for delivery orders — parks the delivery payload in `Order.deliveryPayload` (jsonb) instead of dispatching it. Dispatch is deferred to `processPosAcceptance` (see the cron table), which nulls `deliveryPayload` once the delivery service accepts it; `cancelOrder` nulls it too.
@@ -126,6 +126,24 @@ This is a per-request check only. Nothing writes back to `isWorking`, which stay
 Vitamin-type products (`excludedProductIds`) never receive any promotion discount, enforced both at the caller (order/evaluate) and defensively inside each handler.
 
 `PromotionService.getProductPromotions` is the read-side counterpart: every product-list response (`findAll`, `findAllPaginated`, `search`) attaches a `promotions: [{ type, name }]` array built from the active *product-scoped* promotions, so the client can badge 2+1 items. Display names are hardcoded Uzbek strings in `PROMOTION_NAMES` — they are not localized through the `Localized<T>` mechanism, and the same is true of the discount names in `evaluate`'s breakdown.
+
+### Subscription module
+
+A subscription grants its holder **one free unit of each listed product per business-local day** (`DAILY_FREE_UNITS_PER_PRODUCT` in `subscription.service.ts`). Three entities:
+
+- `Subscription` — localized `title`, `productIds` jsonb (same id-array pattern as `Promotion`, not a join table), `isActive`.
+- `SubscriptionCode` — a 36-character code (a `randomUUID()`, so no uniqueness retry loop is needed, unlike `generateReferralCode`). **A redeemed code *is* the user↔subscription link** — there's no separate assignment table. Admins generate codes and hand them out; `POST /subscription/redeem` binds one to the caller. Single-use, but re-redeeming one's own code is idempotent rather than an error.
+- `SubscriptionRedemption` — one row per free unit granted, written inside `OrderService.create`'s transaction. `OrderItem` can't back the quota because it doesn't record *why* a unit was free. Cancelling an order doesn't delete these rows; the quota query skips cancelled orders instead, which hands the allowance back — same trick as `getLifetimeItemCount`.
+
+A user may hold several subscriptions; their product lists are unioned and deduped, so overlapping lists still yield one free unit per product per day. Deactivating a subscription withdraws the entitlement from every holder at once without touching their codes, so reactivating restores it.
+
+**Interaction with promotions:** subscription free units are *not* part of `resolveExclusivePromotion` — they stack, like loyalty. They're also **not** vitamin-gated, unlike every promotion, since an admin chose the product list explicitly. `OrderService.resolveFreeUnits` consumes subscription units first and caps promotion free units at `quantity - subscription`, so the two sources can never zero out more than a line's quantity between them; `buildDiscountBreakdown` uses that same function, which is what keeps the named breakdown summing to `discountTotal`.
+
+`GET /subscription/me` returns the caller's subscriptions plus each covered product's `remainingToday`. Admin routes: `GET /subscription`, `POST /subscription`, `PATCH /subscription/:id` (edit/activate/deactivate), `POST /subscription/:id/codes` (generate N), `GET /subscription/:id/codes` (with redeemer).
+
+### Business timezone
+
+`BUSINESS_TIMEZONE` (`Asia/Tashkent`) and the `businessTime`/`businessDayRange` helpers in `shared/utils/lib.ts` are the single source of truth for wall-clock reasoning — branch working hours and the subscription daily reset both go through them rather than inheriting the deploy host's TZ. Anything new that means "today" or "what time is it" should use them too.
 
 ### User referral / status tiers
 

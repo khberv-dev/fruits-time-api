@@ -1,5 +1,27 @@
 import bcrypt from 'bcrypt';
 import { randomInt } from 'node:crypto';
+import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
+import timezone from 'dayjs/plugin/timezone';
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
+
+// The business runs in one timezone, so everything that reasons about wall-clock time —
+// branch working hours, "once per day" subscription entitlements — has to agree on it
+// instead of inheriting whatever TZ the deploy host happens to have.
+export const BUSINESS_TIMEZONE = 'Asia/Tashkent';
+
+export function businessTime(at: Date = new Date()) {
+  return dayjs(at).tz(BUSINESS_TIMEZONE);
+}
+
+// Half-open [start, end) bounds of the business-local calendar day containing `at`.
+export function businessDayRange(at: Date = new Date()): { start: Date; end: Date } {
+  const local = businessTime(at);
+
+  return { start: local.startOf('day').toDate(), end: local.add(1, 'day').startOf('day').toDate() };
+}
 
 export function encryptPassword(password: string) {
   return bcrypt.hash(password, 10);

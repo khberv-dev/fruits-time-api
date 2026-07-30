@@ -13,6 +13,7 @@ import { PosterModule } from '@/core/poster/poster.module';
 import { DeliveryModule } from '@/core/delivery/delivery.module';
 import { NotifyModule } from '@/core/notify/notify.module';
 import { PromotionModule } from '@/core/promotion/promotion.module';
+import { SubscriptionModule } from '@/core/subscription/subscription.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { PromotionModule } from '@/core/promotion/promotion.module';
     DeliveryModule,
     NotifyModule,
     PromotionModule,
+    SubscriptionModule,
   ],
   controllers: [OrderController],
   providers: [OrderService],

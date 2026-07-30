@@ -22,6 +22,7 @@ import { computeUserStatus, getStatusDiscount } from '@/core/user/user.service';
 import { DeliveryCreateOrderInput } from '@/core/delivery/types/delivery-create-order-input.type';
 import { DeliveryWebhookBody } from '@/core/delivery/types/delivery-webhook-body.type';
 import { DeliveryDiscount, ItemDiscount, OrderItemInput, PromotionService } from '@/core/promotion/promotion.service';
+import { SubscriptionFreeUnits, SubscriptionService } from '@/core/subscription/subscription.service';
 import { PromotionType } from '@/shared/enums/promotion-type.enum';
 
 const DELIVERY_STAGE_MESSAGE: Record<number, string> = {
@@ -101,6 +102,15 @@ function aggregatePromoByIndex(itemDiscounts: ItemDiscount[]): Map<number, Promo
   return map;
 }
 
+// Free units from a subscription are consumed before promotion free units, so the two
+// sources can never zero out more than the line's quantity between them.
+interface LineFreeUnits {
+  subscription: number;
+  promo: number;
+}
+
+const SUBSCRIPTION_DISCOUNT_NAME = "Obuna bo'yicha bepul mahsulot";
+
 interface PreparedOrder {
   items: OrderItemInput[];
   branch: Branch;
@@ -110,6 +120,8 @@ interface PreparedOrder {
   addressSnapshot: Coordinates | null;
   discountPercent: number;
   promoByIndex: Map<number, PromoAggregate>;
+  subscriptionFree: SubscriptionFreeUnits;
+  resolveFreeUnits: (index: number, quantity: number) => LineFreeUnits;
   getItemLinePrice: (index: number, unitPrice: number, quantity: number) => number;
   getItemUnitPrice: (index: number, unitPrice: number, quantity: number) => number;
   deliveryInput: DeliveryCreateOrderInput | null;
@@ -134,6 +146,7 @@ export class OrderService {
     private readonly deliveryService: DeliveryService,
     private readonly pushService: PushService,
     private readonly promotionService: PromotionService,
+    private readonly subscriptionService: SubscriptionService,
   ) {}
 
   async getDeliveryCost(userId: string, branchId: string, addressId: string): Promise<{ cost: number }> {
@@ -198,7 +211,13 @@ export class OrderService {
       };
     });
 
-    const discounts = this.buildDiscountBreakdown(prepared.items, productById, promoByIndex, discountPercent);
+    const discounts = this.buildDiscountBreakdown(
+      prepared.items,
+      productById,
+      promoByIndex,
+      discountPercent,
+      prepared.resolveFreeUnits,
+    );
     if (deliveryDiscount) discounts.push(deliveryDiscount);
 
     const productsCount = prepared.items.reduce((sum, item) => sum + item.quantity, 0);
@@ -230,6 +249,7 @@ export class OrderService {
       addressSnapshot,
       deliveryInput,
       deliveryCost,
+      subscriptionFree,
       getItemLinePrice,
       getItemUnitPrice,
     } = await this.prepareOrder(userId, locale, data);
@@ -259,6 +279,10 @@ export class OrderService {
         where: { id: inserted.id },
         relations: ['items', 'items.product'],
       });
+
+      // Inside the transaction so a POS/delivery failure below rolls the day's allowance
+      // back along with the order.
+      await this.subscriptionService.recordRedemptions(manager, userId, order.id, subscriptionFree.byProduct);
 
       order.posId = await this.sendToPoster(
         userId,
@@ -368,12 +392,24 @@ export class OrderService {
     );
     const promoByIndex = aggregatePromoByIndex(itemDiscounts);
 
-    // Combines the referral-tier discount with any promotion for this line: promo-free
-    // units are dropped from the billable quantity, remaining units get the better discount.
+    // A subscription hands its holder one free unit per covered product per day. Unlike the
+    // promotions above it isn't product-type gated — the admin picked the list explicitly —
+    // and it stacks rather than joining the exclusivity group.
+    const subscriptionFree = await this.subscriptionService.computeFreeUnits(userId, items);
+
+    const resolveFreeUnits = (index: number, quantity: number): LineFreeUnits => {
+      const subscription = Math.min(subscriptionFree.byIndex.get(index) ?? 0, quantity);
+      const promo = Math.min(promoByIndex.get(index)?.freeUnits ?? 0, quantity - subscription);
+
+      return { subscription, promo };
+    };
+
+    // Combines the referral-tier discount with any promotion for this line: free units are
+    // dropped from the billable quantity, remaining units get the better discount.
     const getItemLinePrice = (index: number, unitPrice: number, quantity: number): number => {
-      const promo = promoByIndex.get(index);
-      const paidQuantity = Math.max(quantity - (promo?.freeUnits ?? 0), 0);
-      const itemDiscountPercent = Math.max(discountPercent, promo?.discountPercent ?? 0);
+      const free = resolveFreeUnits(index, quantity);
+      const paidQuantity = Math.max(quantity - free.subscription - free.promo, 0);
+      const itemDiscountPercent = Math.max(discountPercent, promoByIndex.get(index)?.discountPercent ?? 0);
       return applyDiscount(unitPrice * paidQuantity, itemDiscountPercent);
     };
     const getItemUnitPrice = (index: number, unitPrice: number, quantity: number): number =>
@@ -443,6 +479,8 @@ export class OrderService {
       addressSnapshot,
       discountPercent,
       promoByIndex,
+      subscriptionFree,
+      resolveFreeUnits,
       getItemLinePrice,
       getItemUnitPrice,
       deliveryInput,
@@ -458,19 +496,25 @@ export class OrderService {
     productById: Map<string, Product>,
     promoByIndex: Map<number, PromoAggregate>,
     discountPercent: number,
+    resolveFreeUnits: (index: number, quantity: number) => LineFreeUnits,
   ): { name: string; amount: number }[] {
     let statusAmount = 0;
+    let subscriptionAmount = 0;
     const promoAmountByType = new Map<PromotionType, number>();
 
     items.forEach((item, index) => {
       const product = productById.get(item.productId)!;
       const promo = promoByIndex.get(index);
-      const freeUnits = Math.min(promo?.freeUnits ?? 0, item.quantity);
-      const paidQuantity = item.quantity - freeUnits;
+      const free = resolveFreeUnits(index, item.quantity);
+      const paidQuantity = item.quantity - free.subscription - free.promo;
 
-      if (freeUnits > 0 && promo?.freeUnitsType) {
+      if (free.subscription > 0) {
+        subscriptionAmount += free.subscription * product.price;
+      }
+
+      if (free.promo > 0 && promo?.freeUnitsType) {
         const type = promo.freeUnitsType;
-        promoAmountByType.set(type, (promoAmountByType.get(type) ?? 0) + freeUnits * product.price);
+        promoAmountByType.set(type, (promoAmountByType.get(type) ?? 0) + free.promo * product.price);
       }
 
       const promoPercent = promo?.discountPercent ?? 0;
@@ -489,6 +533,9 @@ export class OrderService {
     });
 
     const discounts: { name: string; amount: number }[] = [];
+    if (subscriptionAmount > 0) {
+      discounts.push({ name: SUBSCRIPTION_DISCOUNT_NAME, amount: subscriptionAmount });
+    }
     if (statusAmount > 0) {
       discounts.push({ name: 'Referal dasturi chegirmasi', amount: statusAmount });
     }
