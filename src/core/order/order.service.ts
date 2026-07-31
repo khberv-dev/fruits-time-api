@@ -123,6 +123,11 @@ interface PreparedOrder {
 
 const POSTER_DELIVERY_BASE = { courierId: 1, processingStatus: 40 };
 
+// How long an order may sit unaccepted in the POS before processPosAcceptance cancels it.
+// Pickup uses the same window to decide whether a POS acceptance still counts.
+const DELIVERY_POS_TIMEOUT_MINUTES = 30;
+const PICKUP_POS_TIMEOUT_MINUTES = 15;
+
 @Injectable()
 export class OrderService {
   private readonly logger = new Logger('Order Service');
@@ -253,6 +258,7 @@ export class OrderService {
 
       const inserted = await orderRepo.save({
         user: { id: userId } as User,
+        branch: { id: branch.id } as Branch,
         type: data.type,
         address: addressSnapshot,
         items: items.map((item, index) => {
@@ -269,7 +275,7 @@ export class OrderService {
 
       const order = await orderRepo.findOneOrFail({
         where: { id: inserted.id },
-        relations: ['items', 'items.product'],
+        relations: ['items', 'items.product', 'branch'],
       });
 
       // Inside the transaction so a POS/delivery failure below rolls the day's allowance
@@ -540,9 +546,9 @@ export class OrderService {
 
   // Every minute: look up every CREATED ("new") order, check which ones now show up as a
   // POS transaction, and either accept + dispatch them or cancel them if staff never
-  // accepted in time. Pickup orders get a 15-minute window and go straight to DONE (no
-  // separate dispatch step); deliveries get a 10-minute window and go to ACCEPTED, then
-  // dispatch to the delivery service.
+  // accepted in time. Pickup orders go straight to DONE (no separate dispatch step);
+  // deliveries go to ACCEPTED and are then dispatched to the delivery service. The two
+  // have separate windows — see PICKUP/DELIVERY_POS_TIMEOUT_MINUTES.
   @Cron(CronExpression.EVERY_MINUTE)
   async processPosAcceptance(): Promise<void> {
     const newOrders = await this.orderRepo.find({
@@ -559,18 +565,20 @@ export class OrderService {
       const isAccepted = order.posId !== null && accepted.has(order.posId);
 
       if (order.type === OrderType.PICKUP) {
-        if (isAccepted && now.diff(order.createdAt, 'minute') <= 15) {
+        if (isAccepted && now.diff(order.createdAt, 'minute') <= PICKUP_POS_TIMEOUT_MINUTES) {
           await this.orderRepo.update(order.id, { status: OrderStatus.DONE });
-          this.logger.log(`processPosAcceptance: pickup order ${order.id} done — accepted in POS within 15 minutes`);
+          this.logger.log(
+            `processPosAcceptance: pickup order ${order.id} done — accepted in POS within ${PICKUP_POS_TIMEOUT_MINUTES} minutes`,
+          );
 
           const session = await this.sessionRepo.findOne({ where: { user: { id: order.user.id } } });
           if (session?.fcmToken) {
             await this.pushService.send(session.fcmToken, 'Fruits Time', 'Buyurtmangiz olinishga tayyor');
           }
-        } else if (now.diff(order.createdAt, 'minute') > 15) {
+        } else if (now.diff(order.createdAt, 'minute') > PICKUP_POS_TIMEOUT_MINUTES) {
           await this.orderRepo.update(order.id, { status: OrderStatus.CANCELLED });
           this.logger.log(
-            `processPosAcceptance: cancelled pickup order ${order.id} — not accepted in POS within 15 minutes`,
+            `processPosAcceptance: cancelled pickup order ${order.id} — not accepted in POS within ${PICKUP_POS_TIMEOUT_MINUTES} minutes`,
           );
         }
         continue;
@@ -595,9 +603,14 @@ export class OrderService {
             this.logger.error(`processPosAcceptance: delivery dispatch failed for order ${order.id}`);
           }
         }
-      } else if (order.type === OrderType.DELIVERY && now.diff(order.createdAt, 'minute') > 10) {
+      } else if (
+        order.type === OrderType.DELIVERY &&
+        now.diff(order.createdAt, 'minute') > DELIVERY_POS_TIMEOUT_MINUTES
+      ) {
         await this.orderRepo.update(order.id, { status: OrderStatus.CANCELLED, deliveryPayload: null });
-        this.logger.log(`processPosAcceptance: cancelled order ${order.id} — not accepted in POS within 10 minutes`);
+        this.logger.log(
+          `processPosAcceptance: cancelled order ${order.id} — not accepted in POS within ${DELIVERY_POS_TIMEOUT_MINUTES} minutes`,
+        );
       }
     }
   }
@@ -653,7 +666,7 @@ export class OrderService {
   async getActiveForUser(userId: string, locale: Locale) {
     const order = await this.orderRepo.findOne({
       where: { user: { id: userId }, status: In([OrderStatus.CREATED, OrderStatus.ACCEPTED]) },
-      relations: ['items', 'items.product'],
+      relations: ['items', 'items.product', 'branch'],
     });
     return order ? this.mapOrder(order, locale) : null;
   }
@@ -661,7 +674,7 @@ export class OrderService {
   async listForUser(userId: string, locale: Locale) {
     const orders = await this.orderRepo.find({
       where: { user: { id: userId } },
-      relations: ['items', 'items.product'],
+      relations: ['items', 'items.product', 'branch'],
       order: { createdAt: 'DESC' },
     });
 
@@ -670,7 +683,7 @@ export class OrderService {
 
   async listForAdmin(page: number, pageSize: number, locale: Locale) {
     const [orders, total] = await this.orderRepo.findAndCount({
-      relations: ['items', 'items.product', 'user'],
+      relations: ['items', 'items.product', 'user', 'branch'],
       order: { createdAt: 'DESC' },
       skip: (page - 1) * pageSize,
       take: pageSize,
@@ -694,7 +707,7 @@ export class OrderService {
   async cancelOrder(orderId: string, locale: Locale) {
     const order = await this.orderRepo.findOne({
       where: { id: orderId },
-      relations: ['items', 'items.product'],
+      relations: ['items', 'items.product', 'branch'],
     });
 
     if (!order) {
@@ -757,6 +770,8 @@ export class OrderService {
       posId: order.posId,
       status: order.status,
       type: order.type,
+      // Null for orders placed before the branch column existed.
+      branch: order.branch ? { id: order.branch.id, name: order.branch.name, address: order.branch.address } : null,
       address: order.address,
       link: order.link,
       deliveryCost: order.deliveryCost,

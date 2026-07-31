@@ -88,6 +88,8 @@ Every `PosterService`/`DeliveryService` method swallows its own errors — loggi
 
 `OrderItem` stores **two** line totals, and the names are the opposite of what they suggest: `price` is the discounted amount actually charged, `actualPrice` is the undiscounted `product.price * quantity`. Both are line totals, not unit prices — don't multiply either by `quantity` again.
 
+`Order.branch` records the fulfilling branch. It's nullable purely for rows predating the column — `posId` is the Poster *transaction* id, not the spot, so old orders can't be backfilled from the database alone. Every query feeding `mapOrder` loads the `branch` relation, and `mapOrder` returns a trimmed `{ id, name, address }` (or `null`) rather than the whole entity.
+
 Any external API failure throws an `InternalServerErrorException` and rolls back the transaction. Both external service methods return `null`/`false` on failure; callers check and throw rather than propagating the raw error.
 
 `POST /order/evaluate` mirrors `create`'s pricing logic (including `productsCount`/`productTypesCount` and a named discount breakdown) without persisting anything or contacting the POS — used by clients to preview price before checkout.
@@ -168,7 +170,7 @@ Four `@Cron` tasks run continuously:
 | `BranchService.sync` | every 10 min | Upserts branches from Poster `spots.getSpots` by `posId` (also exposed as admin `POST /branch/sync`) |
 | `ProductService.syncIngredients` | every 5 min | Fetches ingredient IDs per product from `menu.getProduct` |
 | `ProductService.syncAvailability` | every 10 min | Computes per-branch `available[]` from storage leftovers |
-| `OrderService.processPosAcceptance` | every minute | For every `CREATED` order, branches on type. `DELIVERY`: if it now shows up as a Poster transaction, marks it `ACCEPTED`, pushes an FCM notification, and dispatches the deferred `DeliveryService.createOrder` call; if still unaccepted after 10 minutes, cancels it instead. `PICKUP`: if it shows up as a Poster transaction within 15 minutes of creation, marks it `DONE` directly (no `ACCEPTED` intermediate) and pushes an FCM notification; if still not found after 15 minutes, cancels it. |
+| `OrderService.processPosAcceptance` | every minute | For every `CREATED` order, branches on type. `DELIVERY`: if it now shows up as a Poster transaction, marks it `ACCEPTED`, pushes an FCM notification, and dispatches the deferred `DeliveryService.createOrder` call; if still unaccepted after `DELIVERY_POS_TIMEOUT_MINUTES` (30), cancels it instead. `PICKUP`: if it shows up as a Poster transaction within `PICKUP_POS_TIMEOUT_MINUTES` (15) of creation, marks it `DONE` directly (no `ACCEPTED` intermediate) and pushes an FCM notification; if still not found after that, cancels it. |
 
 `syncAvailability` depends on `ingredients` being populated by `syncIngredients`: it prefers "every ingredient has stock left", and only falls back to the product's own `posId` leftover when `ingredients` is null/empty. Availability is stored as `jsonb ProductAvailability[]` on `Product` (`{ storage_id, left }`), one entry per active branch that has a `storageId`.
 

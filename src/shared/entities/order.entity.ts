@@ -9,6 +9,7 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { User } from '@/shared/entities/user.entity';
+import { Branch } from '@/shared/entities/branch.entity';
 import { OrderItem } from '@/shared/entities/order-item.entity';
 import { OrderStatus } from '@/shared/enums/order-status.enum';
 import { OrderType } from '@/shared/enums/order-type.enum';
@@ -23,6 +24,12 @@ export class Order {
   @ManyToOne(() => User, (user) => user.orders)
   @JoinColumn({ name: 'user_id' })
   user: User;
+
+  // Which branch fulfils the order. Nullable only because orders predating this column
+  // can't be backfilled — posId is the Poster transaction id, not the spot.
+  @ManyToOne(() => Branch, { nullable: true, onDelete: 'RESTRICT' })
+  @JoinColumn({ name: 'branch_id' })
+  branch: Branch | null;
 
   @Column({ type: 'enum', enum: OrderStatus, default: OrderStatus.CREATED })
   status: OrderStatus;
