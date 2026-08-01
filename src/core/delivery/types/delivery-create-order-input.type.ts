@@ -22,6 +22,8 @@ export interface DeliveryOrderItem {
 export interface DeliveryCreateOrderInput {
   vendorOrderId: string;
   items: DeliveryOrderItem[];
+  // What the customer is charged for delivery, i.e. already net of any promotion. This is
+  // the figure declared to the courier — the discount is subtracted here, not itemised.
   deliveryCost?: number;
   origin: {
     location: DeliveryLocation;

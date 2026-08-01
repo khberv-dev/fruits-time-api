@@ -58,6 +58,10 @@ export class DeliveryService {
   }
 
   private buildBody(input: DeliveryCreateOrderInput) {
+    // The delivery promotion is taken straight off this line rather than shown as a
+    // separate discount item: deliveryCost is already net, so a 20,000 quote discounted by
+    // 15,000 is declared as 5,000. Product lines are likewise already net of their own
+    // discounts, so every price here is what the customer actually pays.
     const deliveryItem: (typeof input.items)[number] = {
       name: 'Yetkazib berish',
       price_per_unit: input.deliveryCost ?? 0,

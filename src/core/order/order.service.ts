@@ -181,7 +181,30 @@ export class OrderService {
     });
 
     if (cost === null) throw new InternalServerErrorException('Yetkazib berish narxini hisoblashda xatolik');
-    return { cost };
+
+    // Mirror checkout's promotion so the previewed fee is the one the order will charge.
+    // This endpoint has no cart, so the exclusivity check runs on an empty item list — that
+    // can only suppress FIRST_ORDER_FIRST_ITEM, which can never be eligible at the same
+    // time as free delivery anyway (it needs zero prior orders, free delivery needs a
+    // completed one). If that ever stops holding, this preview will drift from checkout.
+    const exclusivePromotion = await this.promotionService.resolveExclusivePromotion(userId, [], new Set());
+    const discount = await this.promotionService.getDeliveryDiscount(userId, exclusivePromotion);
+
+    return this.applyDeliveryDiscount(cost, discount);
+  }
+
+  // Shared by the delivery-cost preview and prepareOrder so the two can't drift: the
+  // discount is a flat sum, clamped to the quote so the fee floors at 0 instead of
+  // going negative.
+  private applyDeliveryDiscount(
+    cost: number,
+    discount: DeliveryDiscount | null,
+  ): { cost: number; discount: DeliveryDiscount | null } {
+    if (!discount) return { cost, discount: null };
+
+    const amount = Math.min(cost, discount.amount);
+
+    return { cost: cost - amount, discount: { name: discount.name, amount } };
   }
 
   async evaluate(userId: string, locale: Locale, data: CreateOrderRequest) {
@@ -466,12 +489,12 @@ export class OrderService {
       deliveryCost = evaluated;
 
       // "3km free delivery": flat amount off the quote, floored at 0 rather than going negative.
-      const discount = await this.promotionService.getDeliveryDiscount(userId, exclusivePromotion);
-      if (discount) {
-        const amount = Math.min(deliveryCost, discount.amount);
-        deliveryCost -= amount;
-        deliveryDiscount = { name: discount.name, amount };
-      }
+      const discounted = this.applyDeliveryDiscount(
+        deliveryCost,
+        await this.promotionService.getDeliveryDiscount(userId, exclusivePromotion),
+      );
+      deliveryCost = discounted.cost;
+      deliveryDiscount = discounted.discount;
     }
 
     return {

@@ -183,8 +183,16 @@ export class OrderController {
   }
 
   @Get('delivery-cost')
-  @ApiOperation({ summary: 'Calculate delivery cost from a branch to a saved address' })
-  @ApiOkResponse({ description: 'Delivery cost in UZS', schema: { example: { cost: 27500 } } })
+  @ApiOperation({
+    summary: 'Calculate delivery cost from a branch to a saved address',
+    description:
+      '`cost` is the fee the order will actually be charged, i.e. already net of any delivery promotion the ' +
+      'caller qualifies for. `discount` names the promotion and the sum it took off, or is null when none applies.',
+  })
+  @ApiOkResponse({
+    description: 'Delivery cost in UZS, after any promotion',
+    schema: { example: { cost: 12500, discount: { name: 'Yetkazib berishda chegirma', amount: 15000 } } },
+  })
   @ApiBadRequestResponse({ description: 'Branch or address not found / branch has no coordinates' })
   @ApiUnauthorizedResponse({ description: 'Missing or invalid access token' })
   getDeliveryCost(@RequestUser() user: ReqUser, @Query() query: DeliveryCostQuery) {
