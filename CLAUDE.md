@@ -131,6 +131,12 @@ Vitamin-type products (`excludedProductIds`) never receive any promotion discoun
 
 `PromotionService.getProductPromotions` is the read-side counterpart: every product-list response (`findAll`, `findAllPaginated`, `search`) attaches a `promotions: [{ type, name }]` array built from the active *product-scoped* promotions, so the client can badge 2+1 items. Display names are hardcoded Uzbek strings in `PROMOTION_NAMES` — they are not localized through the `Localized<T>` mechanism, and the same is true of the discount names in `evaluate`'s breakdown.
 
+### Admin read APIs
+
+`GET /stats/recent` is the dashboard "latest activity" feed: the 10 newest end-users, the 10 newest orders (with their user, branch, discounted product `total` and `deliveryCost`), and the 10 most recent subscription activations. Activations are read from redeemed `SubscriptionCode` rows — a redeemed code *is* the user↔subscription link — filtered to subscriptions that are still `isActive`.
+
+`GET /user/:userId` and `GET /user/:userId/orders` (both admin) sit **after** every literal path in `UserController`, otherwise `:userId` would swallow `me` and `status-tiers`. Keep new literal routes above them. The orders route reuses `OrderService.listForUserPaginated` and returns the same `{ data, total, page, pageSize }` envelope as `GET /order/admin`; `UserModule` imports `OrderModule` (which now exports `OrderService`) to get it. `UserService.findById` throws 401 (the caller's own token points at a deleted account) while `findOneById` throws 404 (admin looked up an unknown id) — both share `withStatus` for the referral/tier fields.
+
 ### Subscription module
 
 A subscription gives its holder a **fixed sum off the listed products, once per business-local day** (`Subscription.discountAmount`, admin-set). Nothing is free outright: the allowance is pooled across the covered lines and capped by what they cost, so the customer pays any overflow, and it never spills onto products outside the list. With a 120 allowance, a cart of 200 in listed products plus 80 in others totals 160.

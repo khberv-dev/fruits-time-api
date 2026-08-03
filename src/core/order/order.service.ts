@@ -716,6 +716,25 @@ export class OrderService {
     return orders.map((order) => this.mapOrder(order, locale));
   }
 
+  // Same rows as listForUser but paged, for admins inspecting somebody else's history.
+  // Mirrors listForAdmin's envelope so both admin listings deserialize identically.
+  async listForUserPaginated(userId: string, page: number, pageSize: number, locale: Locale) {
+    const [orders, total] = await this.orderRepo.findAndCount({
+      where: { user: { id: userId } },
+      relations: ['items', 'items.product', 'branch'],
+      order: { createdAt: 'DESC' },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+    });
+
+    return {
+      data: orders.map((order) => this.mapOrder(order, locale)),
+      total,
+      page,
+      pageSize,
+    };
+  }
+
   async listForAdmin(page: number, pageSize: number, locale: Locale) {
     const [orders, total] = await this.orderRepo.findAndCount({
       relations: ['items', 'items.product', 'user', 'branch'],

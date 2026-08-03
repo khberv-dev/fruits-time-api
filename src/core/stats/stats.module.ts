@@ -6,9 +6,10 @@ import { Product } from '@/shared/entities/product.entity';
 import { StatsController } from '@/core/stats/stats.controller';
 import { StatsService } from '@/core/stats/stats.service';
 import { Order } from '@/shared/entities/order.entity';
+import { SubscriptionCode } from '@/shared/entities/subscription-code.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([User, Catalog, Product, Order])],
+  imports: [TypeOrmModule.forFeature([User, Catalog, Product, Order, SubscriptionCode])],
   controllers: [StatsController],
   providers: [StatsService],
 })

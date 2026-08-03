@@ -3,6 +3,7 @@ import {
   Injectable,
   InternalServerErrorException,
   Logger,
+  NotFoundException,
   OnApplicationBootstrap,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -98,12 +99,28 @@ export class UserService implements OnApplicationBootstrap {
       },
     });
 
+    // A missing row here means the caller's own token points at a deleted account.
     if (!user) {
       throw new UnauthorizedException();
     }
 
+    return this.withStatus(user);
+  }
+
+  // Admin lookup of somebody else's account: an unknown id is a 404, not a 401.
+  async findOneById(userId: string) {
+    const user = await this.userRepo.findOne({ where: { id: userId } });
+
+    if (!user) {
+      throw new NotFoundException('Foydalanuvchi topilmadi');
+    }
+
+    return this.withStatus(user);
+  }
+
+  private async withStatus(user: User) {
     const referralCount = await this.userRepo.count({
-      where: { referredBy: { id: userId } },
+      where: { referredBy: { id: user.id } },
     });
 
     const { password, ...userData } = user;

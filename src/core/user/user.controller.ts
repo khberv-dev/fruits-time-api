@@ -1,13 +1,16 @@
-import { Body, Controller, Get, Put, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Put, Query } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiForbiddenResponse,
+  ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
+  ApiParam,
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { getStatusTiers, UserService } from '@/core/user/user.service';
+import { OrderService } from '@/core/order/order.service';
 import { RequestUser } from '@/common/decorators/request-user.decorator';
 import type { ReqUser } from '@/shared/types/req-user.type';
 import { Role } from '@/common/decorators/role.decorator';
@@ -37,7 +40,10 @@ const userExample = {
 @ApiBearerAuth('access-token')
 @Controller('user')
 export class UserController {
-  constructor(private readonly userService: UserService) {}
+  constructor(
+    private readonly userService: UserService,
+    private readonly orderService: OrderService,
+  ) {}
 
   @Get('me')
   @ApiOperation({ summary: "Get the authenticated user's profile" })
@@ -115,6 +121,38 @@ export class UserController {
   @ApiForbiddenResponse({ description: 'Caller is not an admin' })
   getAll(@Query() query: PaginationQuery) {
     return this.userService.findAllPaginate(query.page, query.pageSize);
+  }
+
+  // Declared after every literal path ('me', 'status-tiers', 'me/referral') so the
+  // parameterised routes below can't shadow them.
+  @Get(':userId')
+  @Role(UserRole.ADMIN)
+  @ApiOperation({
+    summary: 'Get one account by id (admin only)',
+    description: 'Same shape as `/user/me`, including referral count, status tier and discount.',
+  })
+  @ApiParam({ name: 'userId', example: '6b0a0e1e-5f55-4a3a-9a9b-3a4f2c8a0c1e' })
+  @ApiOkResponse({ description: 'The account (password stripped)', schema: { example: userExample } })
+  @ApiNotFoundResponse({ description: 'No account with that id' })
+  @ApiForbiddenResponse({ description: 'Caller is not an admin' })
+  getOne(@Param('userId', ParseUUIDPipe) userId: string) {
+    return this.userService.findOneById(userId);
+  }
+
+  @Get(':userId/orders')
+  @Role(UserRole.ADMIN)
+  @ApiOperation({
+    summary: "List one account's orders (admin only)",
+    description: 'Paginated, newest first. Same envelope and order shape as `GET /order/admin`.',
+  })
+  @ApiParam({ name: 'userId', example: '6b0a0e1e-5f55-4a3a-9a9b-3a4f2c8a0c1e' })
+  @ApiOkResponse({
+    description: 'Paginated orders for that account',
+    schema: { example: { data: [], total: 12, page: 1, pageSize: 20 } },
+  })
+  @ApiForbiddenResponse({ description: 'Caller is not an admin' })
+  getOrders(@Param('userId', ParseUUIDPipe) userId: string, @Query() query: PaginationQuery) {
+    return this.orderService.listForUserPaginated(userId, query.page, query.pageSize, query.locale);
   }
 
   @Put('me')

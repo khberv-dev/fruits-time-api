@@ -26,5 +26,6 @@ import { SubscriptionModule } from '@/core/subscription/subscription.module';
   ],
   controllers: [OrderController],
   providers: [OrderService],
+  exports: [OrderService],
 })
 export class OrderModule {}
