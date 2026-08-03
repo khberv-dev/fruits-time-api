@@ -86,9 +86,11 @@ const evaluateOrderExample = {
   discounts: [
     { name: 'Birinchi buyurtma uchun chegirma', amount: 15000 },
     { name: '2+1 aksiya (har 3-mahsulot bepul)', amount: 28000 },
+    { name: 'Yetkazib berishda chegirma', amount: 15000 },
   ],
-  discountTotal: 43000,
+  discountTotal: 58000,
   deliveryCost: 12000,
+  deliveryCostBeforeDiscount: 27000,
   total: 103000,
 };
 
@@ -167,7 +169,10 @@ export class OrderController {
       'promotion, including the money value of free units from things like buy-two-get-one-free), ' +
       '`productsCount`/`productTypesCount` (total unit count and distinct product count across the order, ' +
       'including any units auto-added by a promotion), and the overall total — without persisting anything or ' +
-      'contacting the POS.',
+      'contacting the POS. `discountTotal` always equals the sum of `discounts`, delivery promotion included. ' +
+      '`deliveryCost` is the fee actually charged and `deliveryCostBeforeDiscount` the quote it came from ' +
+      '(both null for pickup), so the response reconciles as ' +
+      '`subtotal + deliveryCostBeforeDiscount - discountTotal === total`.',
   })
   @IsPublic()
   @ApiOkResponse({ description: 'Order price evaluation', schema: { example: evaluateOrderExample } })

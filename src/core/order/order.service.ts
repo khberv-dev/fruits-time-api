@@ -146,7 +146,11 @@ export class OrderService {
     private readonly subscriptionService: SubscriptionService,
   ) {}
 
-  async getDeliveryCost(userId: string, branchId: string, addressId: string): Promise<{ cost: number }> {
+  async getDeliveryCost(
+    userId: string,
+    branchId: string,
+    addressId: string,
+  ): Promise<{ cost: number; discount: DeliveryDiscount | null }> {
     const [branch, address, user] = await Promise.all([
       this.branchRepo.findOne({ where: { id: branchId, isActive: true } }),
       this.addressRepo.findOne({ where: { id: addressId, user: { id: userId } } }),
@@ -243,14 +247,22 @@ export class OrderService {
     const productsCount = prepared.items.reduce((sum, item) => sum + item.quantity, 0);
     const productTypesCount = new Set(prepared.items.map((item) => item.productId)).size;
 
+    // `discounts` lists the delivery promotion alongside the product ones, so discountTotal
+    // has to cover it too — otherwise summing the breakdown disagrees with the total we
+    // report. deliveryCost stays the net figure the customer is charged, and the gross
+    // quote is exposed separately so the whole response reconciles:
+    //   subtotal + deliveryCostBeforeDiscount - discountTotal === total
+    const deliveryDiscountAmount = deliveryDiscount?.amount ?? 0;
+
     return {
       items,
       productsCount,
       productTypesCount,
       subtotal,
       discounts,
-      discountTotal: subtotal - total,
+      discountTotal: subtotal - total + deliveryDiscountAmount,
       deliveryCost: deliveryCost ?? null,
+      deliveryCostBeforeDiscount: deliveryCost === undefined ? null : deliveryCost + deliveryDiscountAmount,
       total: total + (deliveryCost ?? 0),
     };
   }

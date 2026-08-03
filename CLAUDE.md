@@ -92,7 +92,7 @@ Every `PosterService`/`DeliveryService` method swallows its own errors — loggi
 
 Any external API failure throws an `InternalServerErrorException` and rolls back the transaction. Both external service methods return `null`/`false` on failure; callers check and throw rather than propagating the raw error.
 
-`POST /order/evaluate` mirrors `create`'s pricing logic (including `productsCount`/`productTypesCount` and a named discount breakdown) without persisting anything or contacting the POS — used by clients to preview price before checkout.
+`POST /order/evaluate` mirrors `create`'s pricing logic (including `productsCount`/`productTypesCount` and a named discount breakdown) without persisting anything or contacting the POS — used by clients to preview price before checkout. Its money fields are meant to reconcile exactly: `discountTotal` is the sum of every entry in `discounts` (the delivery promotion included, which it previously omitted), `deliveryCost` is the net fee charged, `deliveryCostBeforeDiscount` is the quote it came from, and `subtotal + deliveryCostBeforeDiscount - discountTotal === total`. Both delivery fields are `null` on pickup orders.
 
 `POST /order/evaluate` is marked `@IsPublic()` but throws `BadRequestException` when there's no `req.user` — the decorator is only there so an expired token yields a clean 400 instead of a 401.
 
