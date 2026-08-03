@@ -15,6 +15,8 @@ import { CreateOrderRequest } from '@/core/order/dto/create-order-request.dto';
 import { PosterService } from '@/core/poster/poster.service';
 import { DeliveryService } from '@/core/delivery/delivery.service';
 import { PushService } from '@/core/notify/push.service';
+import { escapeHtml, TelegramService } from '@/core/notify/telegram.service';
+import { businessTime } from '@/shared/utils/lib';
 import { OrderType } from '@/shared/enums/order-type.enum';
 import { OrderStatus } from '@/shared/enums/order-status.enum';
 import { ProductType } from '@/shared/enums/product-type.enum';
@@ -142,6 +144,7 @@ export class OrderService {
     private readonly posterService: PosterService,
     private readonly deliveryService: DeliveryService,
     private readonly pushService: PushService,
+    private readonly telegramService: TelegramService,
     private readonly promotionService: PromotionService,
     private readonly subscriptionService: SubscriptionService,
   ) {}
@@ -337,7 +340,39 @@ export class OrderService {
       return order;
     });
 
+    // Outside the transaction and deliberately not awaited: the group post is an alert for
+    // staff, so it must neither roll the order back nor hold up the response if Telegram
+    // is slow or down.
+    if (data.type === OrderType.DELIVERY) {
+      void this.notifyDeliveryOrderCreated(order, branch, userId).catch((error: unknown) => {
+        this.logger.error(
+          `notifyDeliveryOrderCreated failed for order ${order.id}: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+      });
+    }
+
     return this.mapOrder(order, locale);
+  }
+
+  private async notifyDeliveryOrderCreated(order: Order, branch: Branch, userId: string): Promise<void> {
+    const user = await this.userRepo.findOne({ where: { id: userId } });
+    if (!user) return;
+
+    const phone = user.phoneNumber.startsWith('+') ? user.phoneNumber : `+${user.phoneNumber}`;
+
+    const text = [
+      '🚚 <b>Yangi yetkazib berish buyurtmasi</b>',
+      '',
+      `🧾 Buyurtma raqami: <b>${order.posId ?? "noma'lum"}</b>`,
+      `🏪 Filial: ${escapeHtml(branch.name)}`,
+      `👤 Mijoz: ${escapeHtml(user.firstName)}`,
+      `📞 Telefon: ${escapeHtml(phone)}`,
+      `🕒 Sana: ${businessTime(order.createdAt).format('DD.MM.YYYY HH:mm')}`,
+    ].join('\n');
+
+    await this.telegramService.sendMessage(text);
   }
 
   // Shared by create() and evaluate(): validates the branch/products/address and

@@ -28,6 +28,7 @@ Path alias: `@/*` → `src/*` (see `tsconfig.json`). Use this in imports rather 
 - `POSTER_API_URL` / `POSTER_API_KEY` — Poster POS integration (branch sync, order creation, client creation).
 - `DELIVERY_API_URL` / `DELIVERY_API_KEY` — Noor delivery service integration.
 - `FIREBASE_SERVICE_ACCOUNT` — JSON string of a Firebase service-account credential; powers FCM push notifications via `firebase-admin`. If absent, `PushService` logs a warning and silently skips all sends.
+- `TELEGRAM_BOT_TOKEN` / `TELEGRAM_GROUP_CHAT_ID` — Telegram Bot API credentials for the staff group notifier (`TelegramService`). Distinct from `TELEGRAM_BOT_SECRET`, which is the inbound shared secret for `/auth/telegram/*`. Both must be set or, like `PushService`, the notifier logs a warning and no-ops. Group/supergroup chat ids are negative (`-100…`).
 - `PORT` — HTTP port (default `8000`).
 
 ## Architecture
@@ -130,6 +131,12 @@ This is a per-request check only. Nothing writes back to `isWorking`, which stay
 Vitamin-type products (`excludedProductIds`) never receive any promotion discount, enforced both at the caller (order/evaluate) and defensively inside each handler.
 
 `PromotionService.getProductPromotions` is the read-side counterpart: every product-list response (`findAll`, `findAllPaginated`, `search`) attaches a `promotions: [{ type, name }]` array built from the active *product-scoped* promotions, so the client can badge 2+1 items. Display names are hardcoded Uzbek strings in `PROMOTION_NAMES` — they are not localized through the `Localized<T>` mechanism, and the same is true of the discount names in `evaluate`'s breakdown.
+
+### Telegram group notifier
+
+`TelegramService` (`src/core/notify`) posts to a staff group over the Bot API. `sendMessage` is generic and never throws — it swallows and logs, so a notification can't fail the flow that triggered it. Messages use `parse_mode: HTML`, so **anything interpolated from user data must go through the exported `escapeHtml`**; an unbalanced `<` in a customer's name would otherwise make Telegram reject the whole message.
+
+Currently one event fires: `OrderService.notifyDeliveryOrderCreated`, posted when a `DELIVERY` order is created (POS id, branch, customer name/phone, business-local timestamp). It's called **after** the transaction commits and is deliberately not awaited, so Telegram being slow or down neither rolls the order back nor delays the response. Message text lives in `OrderService`, not `TelegramService`, to keep order wording in the order module.
 
 ### Admin read APIs
 
