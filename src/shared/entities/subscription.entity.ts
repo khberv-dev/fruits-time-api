@@ -22,6 +22,12 @@ export class Subscription {
   @Column({ name: 'discount_amount', type: 'int', default: 0 })
   discountAmount: number;
 
+  // How long the entitlement lasts from the moment a code is redeemed. Null means it never
+  // expires, which is what every subscription created before this column did, so existing
+  // holders keep theirs indefinitely.
+  @Column({ name: 'duration_days', type: 'int', nullable: true, default: null })
+  durationDays: number | null;
+
   @Column({ name: 'is_active', default: true })
   isActive: boolean;
 

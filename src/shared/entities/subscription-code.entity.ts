@@ -25,6 +25,13 @@ export class SubscriptionCode {
   @Column({ name: 'redeemed_at', type: 'timestamptz', nullable: true, default: null })
   redeemedAt: Date | null;
 
+  // Snapshotted at redemption from the subscription's durationDays, rather than derived on
+  // read, so later edits to that setting only affect codes redeemed afterwards and can't
+  // retroactively shorten — or instantly lapse — an entitlement someone already holds.
+  // Null means it never expires, which is also what codes redeemed before this column get.
+  @Column({ name: 'expires_at', type: 'timestamptz', nullable: true, default: null })
+  expiresAt: Date | null;
+
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 }

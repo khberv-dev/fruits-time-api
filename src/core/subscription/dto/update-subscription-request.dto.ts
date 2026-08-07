@@ -8,6 +8,7 @@ import {
   IsString,
   IsUUID,
   Min,
+  ValidateIf,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
@@ -43,6 +44,21 @@ export class UpdateSubscriptionRequest {
   @IsInt()
   @Type(() => Number)
   discountAmount?: number;
+
+  @ApiPropertyOptional({
+    example: 30,
+    minimum: 1,
+    nullable: true,
+    description:
+      'Days the entitlement lasts from redemption; `null` makes it never expire. Only applies to codes redeemed ' +
+      'after this change — existing holders keep the expiry snapshotted when they redeemed.',
+  })
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null)
+  @Min(1)
+  @IsInt()
+  @Type(() => Number)
+  durationDays?: number | null;
 
   @ApiPropertyOptional({
     example: false,

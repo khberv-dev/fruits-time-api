@@ -40,6 +40,20 @@ export class CreateSubscriptionRequest {
   @Type(() => Number)
   discountAmount: number;
 
+  @ApiPropertyOptional({
+    example: 30,
+    minimum: 1,
+    description:
+      'How many days the entitlement lasts from the moment a code is redeemed. Omit for a subscription that ' +
+      'never expires. Each code snapshots its own expiry when redeemed, so changing this later only affects ' +
+      'codes redeemed afterwards.',
+  })
+  @IsOptional()
+  @Min(1)
+  @IsInt()
+  @Type(() => Number)
+  durationDays?: number;
+
   @ApiPropertyOptional({ example: true, default: true, description: 'Whether the subscription is live' })
   @IsOptional()
   @IsBoolean()

@@ -2,6 +2,7 @@ import { BadRequestException, ConflictException, Injectable, Logger, NotFoundExc
 import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, In, IsNull, Repository } from 'typeorm';
 import { randomUUID } from 'node:crypto';
+import dayjs from 'dayjs';
 import { Subscription } from '@/shared/entities/subscription.entity';
 import { SubscriptionCode } from '@/shared/entities/subscription-code.entity';
 import { SubscriptionRedemption } from '@/shared/entities/subscription-redemption.entity';
@@ -34,8 +35,16 @@ export interface SubscriptionDiscount {
 }
 
 // Why a code can or can't be used right now. `inactive` outranks `redeemed_by_you` because
-// it's the more useful thing to tell a holder whose subscription has been switched off.
-export type SubscriptionCodeStatus = 'available' | 'redeemed_by_you' | 'redeemed' | 'inactive';
+// it's the more useful thing to tell a holder whose subscription has been switched off, and
+// `expired` distinguishes an entitlement that simply ran out from one that was withdrawn.
+export type SubscriptionCodeStatus = 'available' | 'redeemed_by_you' | 'redeemed' | 'inactive' | 'expired';
+
+// A subscription the user currently holds, with the moment it lapses. `expiresAt` is null
+// when the subscription has no duration set, i.e. it never expires.
+interface ActiveEntitlement {
+  subscription: Subscription;
+  expiresAt: Date | null;
+}
 
 @Injectable()
 export class SubscriptionService {
@@ -59,6 +68,7 @@ export class SubscriptionService {
       title: { [locale]: data.title },
       productIds: data.productIds,
       discountAmount: data.discountAmount,
+      durationDays: data.durationDays ?? null,
       ...(data.isActive !== undefined && { isActive: data.isActive }),
     });
   }
@@ -80,6 +90,12 @@ export class SubscriptionService {
 
     if (data.discountAmount !== undefined) {
       subscription.discountAmount = data.discountAmount;
+    }
+
+    // Only affects codes redeemed from here on: each code snapshots its own expiresAt at
+    // redemption, so existing holders keep the window they were given.
+    if (data.durationDays !== undefined) {
+      subscription.durationDays = data.durationDays;
     }
 
     if (data.isActive !== undefined) {
@@ -132,13 +148,23 @@ export class SubscriptionService {
     }
 
     if (!existing.user) {
+      const redeemedAt = new Date();
+      const durationDays = existing.subscription.durationDays;
+
       existing.user = { id: userId } as User;
-      existing.redeemedAt = new Date();
+      existing.redeemedAt = redeemedAt;
+      existing.expiresAt = durationDays ? dayjs(redeemedAt).add(durationDays, 'day').toDate() : null;
+
       await this.codeRepo.save(existing);
-      this.logger.log(`User ${userId} redeemed a code for subscription ${existing.subscription.id}`);
+      this.logger.log(
+        `User ${userId} redeemed a code for subscription ${existing.subscription.id}` +
+          `${existing.expiresAt ? `, expires ${existing.expiresAt.toISOString()}` : ''}`,
+      );
     }
 
-    return this.buildCodeView(existing, 'redeemed_by_you', locale);
+    // Resolved rather than hardcoded: re-redeeming a code whose entitlement already lapsed
+    // reports `expired` instead of pretending it's live.
+    return this.buildCodeView(existing, this.resolveCodeStatus(existing, userId), locale);
   }
 
   // Look up a code without consuming it, so the client can show what's on offer (and
@@ -159,7 +185,10 @@ export class SubscriptionService {
   private resolveCodeStatus(entry: SubscriptionCode, userId: string): SubscriptionCodeStatus {
     if (entry.user && entry.user.id !== userId) return 'redeemed';
     if (!entry.subscription.isActive) return 'inactive';
-    if (entry.user) return 'redeemed_by_you';
+
+    if (entry.user) {
+      return this.isExpired(entry) ? 'expired' : 'redeemed_by_you';
+    }
 
     return 'available';
   }
@@ -178,6 +207,11 @@ export class SubscriptionService {
       discountAmount: subscription.discountAmount,
       isActive: subscription.isActive,
       status,
+      // How long the entitlement runs once claimed, and — for a code already redeemed —
+      // when it lapses. expiresAt is null on an unredeemed code and on subscriptions that
+      // never expire; the countdown only starts at redemption.
+      durationDays: subscription.durationDays,
+      expiresAt: entry.expiresAt,
       products: products.map((product) => this.localizeProduct(product, locale)),
     };
   }
@@ -191,15 +225,35 @@ export class SubscriptionService {
     };
   }
 
-  // Every subscription the user has redeemed a code for that is still switched on. A user
-  // may hold several; their product lists are unioned.
-  private async getActiveSubscriptions(userId: string): Promise<Subscription[]> {
+  private isExpired(code: SubscriptionCode): boolean {
+    return code.expiresAt !== null && new Date(code.expiresAt).getTime() <= Date.now();
+  }
+
+  // Every subscription the user has redeemed a code for that is still switched on and
+  // hasn't run out. A user may hold several; their product lists are unioned. Holding two
+  // codes for the same subscription keeps the most generous expiry — never-expiring beats
+  // dated, otherwise the later date — so re-redeeming effectively extends the entitlement.
+  private async getActiveSubscriptions(userId: string): Promise<ActiveEntitlement[]> {
     const codes = await this.codeRepo.find({
       where: { user: { id: userId }, subscription: { isActive: true } },
       relations: ['subscription'],
     });
 
-    const byId = new Map(codes.map((entry) => [entry.subscription.id, entry.subscription]));
+    const byId = new Map<string, ActiveEntitlement>();
+
+    for (const code of codes) {
+      if (this.isExpired(code)) continue;
+      const expiresAt = code.expiresAt;
+
+      const existing = byId.get(code.subscription.id);
+      const isMoreGenerous =
+        !existing ||
+        (existing.expiresAt !== null && (expiresAt === null || expiresAt.getTime() > existing.expiresAt.getTime()));
+
+      if (isMoreGenerous) {
+        byId.set(code.subscription.id, { subscription: code.subscription, expiresAt });
+      }
+    }
 
     return [...byId.values()];
   }
@@ -207,11 +261,11 @@ export class SubscriptionService {
   // The covered product list and the daily budget, unioned/summed across every active
   // subscription the user holds.
   private async getEntitlement(userId: string): Promise<{ productIds: Set<string>; dailyAmount: number }> {
-    const subscriptions = await this.getActiveSubscriptions(userId);
+    const entitlements = await this.getActiveSubscriptions(userId);
 
     return {
-      productIds: new Set(subscriptions.flatMap((subscription) => subscription.productIds ?? [])),
-      dailyAmount: subscriptions.reduce((sum, subscription) => sum + subscription.discountAmount, 0),
+      productIds: new Set(entitlements.flatMap((entry) => entry.subscription.productIds ?? [])),
+      dailyAmount: entitlements.reduce((sum, entry) => sum + entry.subscription.discountAmount, 0),
     };
   }
 
@@ -282,13 +336,13 @@ export class SubscriptionService {
   // What the app shows a subscriber: their subscriptions, the products the daily allowance
   // can be spent on, and how much of it is left today.
   async getForUser(userId: string, locale: Locale) {
-    const subscriptions = await this.getActiveSubscriptions(userId);
-    if (!subscriptions.length) {
+    const entitlements = await this.getActiveSubscriptions(userId);
+    if (!entitlements.length) {
       return { subscriptions: [], products: [], dailyDiscountAmount: 0, remainingToday: 0 };
     }
 
-    const productIds = [...new Set(subscriptions.flatMap((subscription) => subscription.productIds ?? []))];
-    const dailyDiscountAmount = subscriptions.reduce((sum, subscription) => sum + subscription.discountAmount, 0);
+    const productIds = [...new Set(entitlements.flatMap((entry) => entry.subscription.productIds ?? []))];
+    const dailyDiscountAmount = entitlements.reduce((sum, entry) => sum + entry.subscription.discountAmount, 0);
 
     const [products, usedToday] = await Promise.all([
       productIds.length ? this.productRepo.find({ where: { id: In(productIds) } }) : Promise.resolve([]),
@@ -296,10 +350,14 @@ export class SubscriptionService {
     ]);
 
     return {
-      subscriptions: subscriptions.map((subscription) => ({
-        id: subscription.id,
-        title: subscription.getTitle(locale),
-        discountAmount: subscription.discountAmount,
+      subscriptions: entitlements.map((entry) => ({
+        id: entry.subscription.id,
+        title: entry.subscription.getTitle(locale),
+        discountAmount: entry.subscription.discountAmount,
+        durationDays: entry.subscription.durationDays,
+        // Null when the subscription has no duration, i.e. it never expires. Expired ones
+        // are filtered out upstream, so anything listed here is still valid.
+        expiresAt: entry.expiresAt,
       })),
       products: products.map((product) => this.localizeProduct(product, locale)),
       dailyDiscountAmount,
