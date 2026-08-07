@@ -19,6 +19,11 @@ import { UpdateSubscriptionRequest } from '@/core/subscription/dto/update-subscr
 // without a retry loop, unlike the shorter referral codes.
 const CODE_LENGTH = 36;
 
+// Every activation expires this many days out unless an admin set something else on the
+// subscription. Applied at redemption, so a subscription row left without a duration —
+// including any created before the column existed — still produces a dated entitlement.
+export const DEFAULT_SUBSCRIPTION_DURATION_DAYS = 30;
+
 // A line of the order the discount can be spent against, priced after every other discount.
 export interface DiscountableLine {
   productId: string;
@@ -68,7 +73,7 @@ export class SubscriptionService {
       title: { [locale]: data.title },
       productIds: data.productIds,
       discountAmount: data.discountAmount,
-      durationDays: data.durationDays ?? null,
+      durationDays: data.durationDays ?? DEFAULT_SUBSCRIPTION_DURATION_DAYS,
       ...(data.isActive !== undefined && { isActive: data.isActive }),
     });
   }
@@ -149,16 +154,15 @@ export class SubscriptionService {
 
     if (!existing.user) {
       const redeemedAt = new Date();
-      const durationDays = existing.subscription.durationDays;
 
       existing.user = { id: userId } as User;
       existing.redeemedAt = redeemedAt;
-      existing.expiresAt = durationDays ? dayjs(redeemedAt).add(durationDays, 'day').toDate() : null;
+      existing.expiresAt = dayjs(redeemedAt).add(this.resolveDurationDays(existing.subscription), 'day').toDate();
 
       await this.codeRepo.save(existing);
       this.logger.log(
-        `User ${userId} redeemed a code for subscription ${existing.subscription.id}` +
-          `${existing.expiresAt ? `, expires ${existing.expiresAt.toISOString()}` : ''}`,
+        `User ${userId} redeemed a code for subscription ${existing.subscription.id}, ` +
+          `expires ${existing.expiresAt.toISOString()}`,
       );
     }
 
@@ -207,10 +211,9 @@ export class SubscriptionService {
       discountAmount: subscription.discountAmount,
       isActive: subscription.isActive,
       status,
-      // How long the entitlement runs once claimed, and — for a code already redeemed —
-      // when it lapses. expiresAt is null on an unredeemed code and on subscriptions that
-      // never expire; the countdown only starts at redemption.
-      durationDays: subscription.durationDays,
+      // How long the entitlement will run once claimed, and — for a code already redeemed —
+      // when it lapses. expiresAt is null until redemption; the countdown starts then.
+      durationDays: this.resolveDurationDays(subscription),
       expiresAt: entry.expiresAt,
       products: products.map((product) => this.localizeProduct(product, locale)),
     };
@@ -223,6 +226,13 @@ export class SubscriptionService {
       description: product.getDescription(locale),
       compound: product.getCompound(locale),
     };
+  }
+
+  // A subscription row without an explicit duration still activates for the default window,
+  // so every activation is dated. Legacy codes redeemed before expiry existed keep their
+  // null expiresAt and stay permanent — this only governs new activations.
+  private resolveDurationDays(subscription: Subscription): number {
+    return subscription.durationDays ?? DEFAULT_SUBSCRIPTION_DURATION_DAYS;
   }
 
   private isExpired(code: SubscriptionCode): boolean {
@@ -354,9 +364,9 @@ export class SubscriptionService {
         id: entry.subscription.id,
         title: entry.subscription.getTitle(locale),
         discountAmount: entry.subscription.discountAmount,
-        durationDays: entry.subscription.durationDays,
-        // Null when the subscription has no duration, i.e. it never expires. Expired ones
-        // are filtered out upstream, so anything listed here is still valid.
+        durationDays: this.resolveDurationDays(entry.subscription),
+        // Expired entitlements are filtered out upstream, so anything listed here is still
+        // valid. Null only for legacy codes redeemed before expiry existed.
         expiresAt: entry.expiresAt,
       })),
       products: products.map((product) => this.localizeProduct(product, locale)),

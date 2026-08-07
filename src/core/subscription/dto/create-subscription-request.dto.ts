@@ -42,11 +42,12 @@ export class CreateSubscriptionRequest {
 
   @ApiPropertyOptional({
     example: 30,
+    default: 30,
     minimum: 1,
     description:
-      'How many days the entitlement lasts from the moment a code is redeemed. Omit for a subscription that ' +
-      'never expires. Each code snapshots its own expiry when redeemed, so changing this later only affects ' +
-      'codes redeemed afterwards.',
+      'How many days the entitlement lasts from the moment a code is redeemed. Defaults to 30 when omitted. ' +
+      'Each code snapshots its own expiry when redeemed, so changing this later only affects codes redeemed ' +
+      'afterwards.',
   })
   @IsOptional()
   @Min(1)
