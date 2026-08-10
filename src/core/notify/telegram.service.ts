@@ -9,6 +9,13 @@ export function escapeHtml(value: string): string {
   return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
+// Telegram caps callback_data at 64 bytes, so keep the prefix short — `<action>:<uuid>`
+// leaves plenty of room.
+export interface InlineButton {
+  text: string;
+  callbackData: string;
+}
+
 @Injectable()
 export class TelegramService implements OnModuleInit {
   private readonly logger = new Logger(TelegramService.name);
@@ -33,7 +40,8 @@ export class TelegramService implements OnModuleInit {
   }
 
   // Never throws: a notification failing must not fail the flow that triggered it.
-  async sendMessage(text: string): Promise<void> {
+  // `buttons` is a grid — each inner array is one row of inline buttons.
+  async sendMessage(text: string, buttons?: InlineButton[][]): Promise<void> {
     if (!this.apiClient || !this.chatId) return;
 
     try {
@@ -42,10 +50,51 @@ export class TelegramService implements OnModuleInit {
         text,
         parse_mode: 'HTML',
         disable_web_page_preview: true,
+        ...(buttons?.length ? { reply_markup: { inline_keyboard: this.toInlineKeyboard(buttons) } } : {}),
       });
     } catch (error) {
       this.logger.error(`sendMessage failed: ${this.formatError(error)}`);
     }
+  }
+
+  // Telegram shows a spinner on the pressed button until this is answered, so it should be
+  // called on every callback — including ones we reject.
+  async answerCallbackQuery(callbackQueryId: string, text: string): Promise<void> {
+    if (!this.apiClient) return;
+
+    try {
+      await this.apiClient.post('/answerCallbackQuery', { callback_query_id: callbackQueryId, text });
+    } catch (error) {
+      this.logger.error(`answerCallbackQuery failed: ${this.formatError(error)}`);
+    }
+  }
+
+  // Rewrites an already-posted message, typically to record the outcome and drop the
+  // buttons so the action can't be triggered twice from the same post.
+  async editMessageText(
+    chatId: number | string,
+    messageId: number,
+    text: string,
+    buttons?: InlineButton[][],
+  ): Promise<void> {
+    if (!this.apiClient) return;
+
+    try {
+      await this.apiClient.post('/editMessageText', {
+        chat_id: chatId,
+        message_id: messageId,
+        text,
+        parse_mode: 'HTML',
+        disable_web_page_preview: true,
+        reply_markup: { inline_keyboard: this.toInlineKeyboard(buttons ?? []) },
+      });
+    } catch (error) {
+      this.logger.error(`editMessageText failed: ${this.formatError(error)}`);
+    }
+  }
+
+  private toInlineKeyboard(buttons: InlineButton[][]) {
+    return buttons.map((row) => row.map((button) => ({ text: button.text, callback_data: button.callbackData })));
   }
 
   private formatError(error: unknown): string {

@@ -13,7 +13,9 @@ import { User } from '@/shared/entities/user.entity';
 import { Order } from '@/shared/entities/order.entity';
 import { OrderStatus } from '@/shared/enums/order-status.enum';
 import { Locale } from '@/shared/enums/locale.enum';
-import { businessDayRange } from '@/shared/utils/lib';
+import { businessDayRange, businessTime } from '@/shared/utils/lib';
+import { escapeHtml, TelegramService } from '@/core/notify/telegram.service';
+import { TelegramUpdate } from '@/core/notify/types/telegram-update.type';
 import { CreateSubscriptionRequest } from '@/core/subscription/dto/create-subscription-request.dto';
 import { UpdateSubscriptionRequest } from '@/core/subscription/dto/update-subscription-request.dto';
 
@@ -25,6 +27,10 @@ const CODE_LENGTH = 36;
 // subscription. Applied at redemption, so a subscription row left without a duration —
 // including any created before the column existed — still produces a dated entitlement.
 export const DEFAULT_SUBSCRIPTION_DURATION_DAYS = 30;
+
+// Prefix of the inline button's callback_data: `<action>:<requestId>`. Kept short because
+// Telegram caps callback_data at 64 bytes and a UUID already takes 36.
+const ACCEPT_REQUEST_ACTION = 'subreq_accept';
 
 // A line of the order the discount can be spent against, priced after every other discount.
 export interface DiscountableLine {
@@ -63,6 +69,8 @@ export class SubscriptionService {
     @InjectRepository(SubscriptionRedemption) private readonly redemptionRepo: Repository<SubscriptionRedemption>,
     @InjectRepository(Product) private readonly productRepo: Repository<Product>,
     @InjectRepository(SubscriptionRequest) private readonly requestRepo: Repository<SubscriptionRequest>,
+    @InjectRepository(User) private readonly userRepo: Repository<User>,
+    private readonly telegramService: TelegramService,
   ) {}
 
   findAll(): Promise<Subscription[]> {
@@ -385,6 +393,7 @@ export class SubscriptionService {
     const outstanding = await this.requestRepo.findOne({
       where: { user: { id: userId }, status: SubscriptionRequestStatus.NEW },
     });
+    // Deliberately no repost: the group already has a card for this customer.
     if (outstanding) return outstanding;
 
     const request = await this.requestRepo.save({
@@ -394,7 +403,89 @@ export class SubscriptionService {
 
     this.logger.log(`User ${userId} requested a subscription (${request.id})`);
 
+    // Not awaited: the group post is an alert for staff, so Telegram being slow or down
+    // must not hold up or fail the customer's request.
+    void this.postRequestToGroup(request, userId).catch((error: unknown) => {
+      this.logger.error(
+        `postRequestToGroup failed for ${request.id}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    });
+
     return request;
+  }
+
+  private async postRequestToGroup(request: SubscriptionRequest, userId: string): Promise<void> {
+    const user = await this.userRepo.findOne({ where: { id: userId } });
+    if (!user) return;
+
+    const text = [
+      "🔔 <b>Obuna uchun so'rov</b>",
+      '',
+      `👤 Mijoz: ${escapeHtml(user.firstName)}`,
+      `📞 Telefon: ${escapeHtml(this.formatPhone(user.phoneNumber))}`,
+      `🕒 Sana: ${businessTime(request.createdAt).format('DD.MM.YYYY HH:mm')}`,
+    ].join('\n');
+
+    await this.telegramService.sendMessage(text, [
+      [{ text: '✅ Qabul qilindi', callbackData: `${ACCEPT_REQUEST_ACTION}:${request.id}` }],
+    ]);
+  }
+
+  // Handles the inline button on those group posts. Anyone in the group can press it — the
+  // group's membership is the access control, since Telegram accounts aren't mapped to
+  // admin users here.
+  async handleTelegramCallback(update: TelegramUpdate): Promise<void> {
+    const query = update.callback_query;
+    if (!query) return;
+
+    const requestId = query.data?.startsWith(`${ACCEPT_REQUEST_ACTION}:`)
+      ? query.data.slice(ACCEPT_REQUEST_ACTION.length + 1)
+      : null;
+
+    if (!requestId) {
+      await this.telegramService.answerCallbackQuery(query.id, "Noma'lum amal");
+      return;
+    }
+
+    const request = await this.requestRepo.findOne({ where: { id: requestId }, relations: ['user'] });
+    if (!request) {
+      await this.telegramService.answerCallbackQuery(query.id, "So'rov topilmadi");
+      return;
+    }
+
+    const alreadyAccepted = request.status === SubscriptionRequestStatus.ACCEPTED;
+    if (!alreadyAccepted) {
+      request.status = SubscriptionRequestStatus.ACCEPTED;
+      await this.requestRepo.save(request);
+      this.logger.log(`Request ${request.id} accepted from Telegram by ${query.from?.id ?? 'unknown'}`);
+    }
+
+    await this.telegramService.answerCallbackQuery(
+      query.id,
+      alreadyAccepted ? 'Allaqachon qabul qilingan' : 'Qabul qilindi',
+    );
+
+    // Rewrite the card without its button so the same post can't be actioned twice, and so
+    // the group can see who took it.
+    const chatId = query.message?.chat?.id;
+    if (chatId !== undefined && query.message?.message_id !== undefined) {
+      const acceptedBy = escapeHtml(query.from?.first_name ?? 'admin');
+      const text = [
+        "🔔 <b>Obuna uchun so'rov</b>",
+        '',
+        `👤 Mijoz: ${escapeHtml(request.user.firstName)}`,
+        `📞 Telefon: ${escapeHtml(this.formatPhone(request.user.phoneNumber))}`,
+        `🕒 Sana: ${businessTime(request.createdAt).format('DD.MM.YYYY HH:mm')}`,
+        '',
+        `✅ Qabul qilindi — ${acceptedBy}, ${businessTime(new Date()).format('DD.MM.YYYY HH:mm')}`,
+      ].join('\n');
+
+      await this.telegramService.editMessageText(chatId, query.message.message_id, text);
+    }
+  }
+
+  private formatPhone(phoneNumber: string): string {
+    return phoneNumber.startsWith('+') ? phoneNumber : `+${phoneNumber}`;
   }
 
   async listRequests(page: number, pageSize: number, status?: SubscriptionRequestStatus) {
