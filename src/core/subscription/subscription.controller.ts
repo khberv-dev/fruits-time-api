@@ -22,6 +22,8 @@ import { CreateSubscriptionRequest } from '@/core/subscription/dto/create-subscr
 import { UpdateSubscriptionRequest } from '@/core/subscription/dto/update-subscription-request.dto';
 import { GenerateCodesRequest } from '@/core/subscription/dto/generate-codes-request.dto';
 import { RedeemCodeRequest } from '@/core/subscription/dto/redeem-code-request.dto';
+import { UpdateRequestStatusRequest } from '@/core/subscription/dto/update-request-status.dto';
+import { SubscriptionRequestQuery } from '@/core/subscription/dto/subscription-request-query.dto';
 
 const subscriptionExample = {
   id: 'c4d5e6f7-8901-2345-bcde-f12345678901',
@@ -63,6 +65,22 @@ const codeViewExample = {
       isActive: true,
     },
   ],
+};
+
+const requestExample = {
+  id: 'e6f7a8b9-0123-4567-def0-234567890123',
+  status: 'new',
+  createdAt: '2026-08-10T09:00:00.000Z',
+  updatedAt: '2026-08-10T09:00:00.000Z',
+};
+
+const requestWithUserExample = {
+  ...requestExample,
+  user: {
+    id: '6b0a0e1e-5f55-4a3a-9a9b-3a4f2c8a0c1e',
+    firstName: 'Aziz',
+    phoneNumber: '998901234567',
+  },
 };
 
 const mySubscriptionExample = {
@@ -146,6 +164,56 @@ export class SubscriptionController {
   @ApiUnauthorizedResponse({ description: 'Missing or invalid access token' })
   redeem(@RequestUser() user: ReqUser, @Query() query: BasicQuery, @Body() body: RedeemCodeRequest) {
     return this.subscriptionService.redeem(user.id, body.code, query.locale);
+  }
+
+  @Post('request')
+  @ApiBearerAuth('access-token')
+  @ApiOperation({
+    summary: 'Ask to be signed up for a subscription',
+    description:
+      'Records the caller on the admin call list. Grants nothing on its own — an admin still has to contact ' +
+      'them and hand over a code. Calling this again while a `new` request is outstanding returns that same ' +
+      'request instead of queueing a duplicate.',
+  })
+  @ApiCreatedResponse({ description: 'The outstanding request', schema: { example: requestExample } })
+  @ApiUnauthorizedResponse({ description: 'Missing or invalid access token' })
+  createRequest(@RequestUser() user: ReqUser) {
+    return this.subscriptionService.createRequest(user.id);
+  }
+
+  @Get('request')
+  @Role(UserRole.ADMIN)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({
+    summary: 'List subscription requests (admin only)',
+    description:
+      'Paginated, **oldest first** — this is a queue of customers waiting to be called. Pass `status=new` for ' +
+      'the outstanding ones. Each row carries the phone number to call.',
+  })
+  @ApiOkResponse({
+    description: 'Paginated requests',
+    schema: { example: { data: [requestWithUserExample], total: 12, page: 1, pageSize: 20 } },
+  })
+  @ApiForbiddenResponse({ description: 'Caller is not an admin' })
+  listRequests(@Query() query: SubscriptionRequestQuery) {
+    return this.subscriptionService.listRequests(query.page, query.pageSize, query.status);
+  }
+
+  @Patch('request/:id')
+  @Role(UserRole.ADMIN)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({
+    summary: 'Set a request status (admin only)',
+    description:
+      'Marks whether the customer has been contacted. `accepted` is bookkeeping only: it creates no ' +
+      'subscription and hands out no code, so the entitlement still has to be granted by generating one.',
+  })
+  @ApiParam({ name: 'id', example: 'e6f7a8b9-0123-4567-def0-234567890123' })
+  @ApiOkResponse({ description: 'Updated request', schema: { example: { ...requestExample, status: 'accepted' } } })
+  @ApiNotFoundResponse({ description: 'Request not found' })
+  @ApiForbiddenResponse({ description: 'Caller is not an admin' })
+  updateRequestStatus(@Param('id', ParseUUIDPipe) id: string, @Body() body: UpdateRequestStatusRequest) {
+    return this.subscriptionService.updateRequestStatus(id, body.status);
   }
 
   @Get()

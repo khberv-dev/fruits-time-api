@@ -166,6 +166,8 @@ A user may hold several subscriptions: their product lists are unioned and their
 
 Admin routes: `GET /subscription`, `POST /subscription`, `PATCH /subscription/:id` (edit/activate/deactivate/set amount), `POST /subscription/:id/codes` (generate N), `GET /subscription/:id/codes` (with redeemer).
 
+**Subscription requests** (`SubscriptionRequest`, status `new` | `accepted`) are a *call list*, not an entitlement — accepting one creates no subscription and hands out no code, it only records that an admin has contacted the customer. Granting access stays the manual generate-a-code step. `POST /subscription/request` (any authenticated user) returns the caller's outstanding `new` request instead of queueing a duplicate. `GET /subscription/request?status=new` (admin) is paginated **oldest first**, since it's a queue, and includes each customer's phone number. `PATCH /subscription/request/:id` (admin) sets the status. These routes are declared **before** `PATCH /subscription/:id` and the other `:id` routes so `request` isn't parsed as a subscription id.
+
 ### Business timezone
 
 `BUSINESS_TIMEZONE` (`Asia/Tashkent`) and the `businessTime`/`businessDayRange` helpers in `shared/utils/lib.ts` are the single source of truth for wall-clock reasoning — branch working hours and the subscription daily reset both go through them rather than inheriting the deploy host's TZ. Anything new that means "today" or "what time is it" should use them too.

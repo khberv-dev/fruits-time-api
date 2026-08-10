@@ -6,6 +6,8 @@ import dayjs from 'dayjs';
 import { Subscription } from '@/shared/entities/subscription.entity';
 import { SubscriptionCode } from '@/shared/entities/subscription-code.entity';
 import { SubscriptionRedemption } from '@/shared/entities/subscription-redemption.entity';
+import { SubscriptionRequest } from '@/shared/entities/subscription-request.entity';
+import { SubscriptionRequestStatus } from '@/shared/enums/subscription-request-status.enum';
 import { Product } from '@/shared/entities/product.entity';
 import { User } from '@/shared/entities/user.entity';
 import { Order } from '@/shared/entities/order.entity';
@@ -60,6 +62,7 @@ export class SubscriptionService {
     @InjectRepository(SubscriptionCode) private readonly codeRepo: Repository<SubscriptionCode>,
     @InjectRepository(SubscriptionRedemption) private readonly redemptionRepo: Repository<SubscriptionRedemption>,
     @InjectRepository(Product) private readonly productRepo: Repository<Product>,
+    @InjectRepository(SubscriptionRequest) private readonly requestRepo: Repository<SubscriptionRequest>,
   ) {}
 
   findAll(): Promise<Subscription[]> {
@@ -373,6 +376,64 @@ export class SubscriptionService {
       dailyDiscountAmount,
       remainingToday: Math.max(dailyDiscountAmount - usedToday, 0),
     };
+  }
+
+  // A customer asking to be signed up. Deliberately grants nothing — it's a call list, so
+  // an admin still has to generate a code and hand it over. An outstanding request is
+  // returned as-is rather than duplicated, so repeat taps don't spam the list.
+  async createRequest(userId: string): Promise<SubscriptionRequest> {
+    const outstanding = await this.requestRepo.findOne({
+      where: { user: { id: userId }, status: SubscriptionRequestStatus.NEW },
+    });
+    if (outstanding) return outstanding;
+
+    const request = await this.requestRepo.save({
+      user: { id: userId } as User,
+      status: SubscriptionRequestStatus.NEW,
+    });
+
+    this.logger.log(`User ${userId} requested a subscription (${request.id})`);
+
+    return request;
+  }
+
+  async listRequests(page: number, pageSize: number, status?: SubscriptionRequestStatus) {
+    const [requests, total] = await this.requestRepo.findAndCount({
+      where: status ? { status } : {},
+      relations: ['user'],
+      // Oldest first: this is a queue of people waiting to be called.
+      order: { createdAt: 'ASC' },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+    });
+
+    return {
+      data: requests.map((request) => ({
+        id: request.id,
+        status: request.status,
+        createdAt: request.createdAt,
+        updatedAt: request.updatedAt,
+        user: {
+          id: request.user.id,
+          firstName: request.user.firstName,
+          phoneNumber: request.user.phoneNumber,
+        },
+      })),
+      total,
+      page,
+      pageSize,
+    };
+  }
+
+  async updateRequestStatus(id: string, status: SubscriptionRequestStatus): Promise<SubscriptionRequest> {
+    const request = await this.requestRepo.findOne({ where: { id } });
+    if (!request) {
+      throw new NotFoundException("So'rov topilmadi");
+    }
+
+    request.status = status;
+
+    return this.requestRepo.save(request);
   }
 
   async countUnredeemed(id: string): Promise<number> {
