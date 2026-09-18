@@ -27,7 +27,7 @@ export class DeliveryService {
 
     this.apiClient = axios.create({
       baseURL: this.config.getOrThrow<string>('DELIVERY_API_URL'),
-      headers: apiKey ? { Authorization: `Bearer ${apiKey}` } : undefined,
+      headers: apiKey ? { 'X-Auth': apiKey } : undefined,
       httpAgent,
       httpsAgent,
     });
