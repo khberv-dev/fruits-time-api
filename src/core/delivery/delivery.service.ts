@@ -31,6 +31,19 @@ export class DeliveryService {
       httpAgent,
       httpsAgent,
     });
+
+    // Failures are already logged with their response body in each method's catch block;
+    // these interceptors cover the success path so a full req/resp trail exists either way.
+    this.apiClient.interceptors.request.use((requestConfig) => {
+      this.logger.debug(
+        `-> ${requestConfig.method?.toUpperCase()} ${requestConfig.url} ${JSON.stringify(requestConfig.data)}`,
+      );
+      return requestConfig;
+    });
+    this.apiClient.interceptors.response.use((response) => {
+      this.logger.debug(`<- ${response.status} ${response.config.url} ${JSON.stringify(response.data)}`);
+      return response;
+    });
   }
 
   async evalOrder(input: DeliveryCreateOrderInput): Promise<number | null> {
